@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node tests/run-tests.mjs"
   },
   "dependencies": {
     "@runanywhere/web": "0.1.0-beta.8",
