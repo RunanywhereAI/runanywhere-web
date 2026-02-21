@@ -1,67 +1,137 @@
-import { useState, useEffect } from 'react';
-import { initSDK, getAccelerationMode } from './runanywhere';
-import { ChatTab } from './components/ChatTab';
-import { VisionTab } from './components/VisionTab';
-import { VoiceTab } from './components/VoiceTab';
+import { useEffect, useMemo, useState } from 'react';
+import { AppShell, type Route } from './components/AppShell';
+import { CoachPage } from './features/chat/CoachPage';
+import { PosturePage } from './features/posture/PosturePage';
+import { DashboardPage, SettingsPage, WorkoutHistoryPage, WorkoutsPage } from './app/pages';
+import { addPostureSession, addWorkoutSession, createDemoWorkouts, loadData, saveData } from './lib/storage';
+import { getAccelerationMode, getModelStatus, init } from './lib/runanywhere';
+import type { StoredData } from './types/storage';
 
-type Tab = 'chat' | 'vision' | 'voice';
+interface Toast {
+  id: string;
+  text: string;
+  kind: 'error' | 'info';
+}
 
 export function App() {
-  const [sdkReady, setSdkReady] = useState(false);
-  const [sdkError, setSdkError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>('chat');
+  const [ready, setReady] = useState(false);
+  const [route, setRoute] = useState<Route>('dashboard');
+  const [data, setData] = useState<StoredData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const pushToast = (text: string, kind: 'error' | 'info' = 'info') => {
+    const id = crypto.randomUUID();
+    setToasts((prev) => [...prev, { id, text, kind }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
+  };
 
   useEffect(() => {
-    initSDK()
-      .then(() => setSdkReady(true))
-      .catch((err) => setSdkError(err instanceof Error ? err.message : String(err)));
+    void (async () => {
+      try {
+        const loaded = await loadData();
+        setData(loaded);
+        document.body.classList.toggle('dark', loaded.settings.darkMode);
+        await init();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setReady(true);
+      }
+    })();
   }, []);
 
-  if (sdkError) {
-    return (
-      <div className="app-loading">
-        <h2>SDK Error</h2>
-        <p className="error-text">{sdkError}</p>
-      </div>
-    );
-  }
-
-  if (!sdkReady) {
-    return (
-      <div className="app-loading">
-        <div className="spinner" />
-        <h2>Loading RunAnywhere SDK...</h2>
-        <p>Initializing on-device AI engine</p>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!data) return;
+    void saveData(data);
+    document.body.classList.toggle('dark', data.settings.darkMode);
+  }, [data]);
 
   const accel = getAccelerationMode();
 
+  const content = useMemo(() => {
+    if (!data) return null;
+    if (route === 'dashboard') return <DashboardPage />;
+    if (route === 'coach') {
+      return (
+        <CoachPage
+          session={data.chatSession}
+          setSession={(updater) => setData((prev) => prev ? { ...prev, chatSession: updater(prev.chatSession) } : prev)}
+          onSavePlan={(title, content) => setData((prev) => prev ? { ...prev, savedPlans: [{ id: crypto.randomUUID(), title, content, createdAt: Date.now() }, ...prev.savedPlans] } : prev)}
+          autoSpeak={data.settings.autoSpeak}
+          pushToast={pushToast}
+        />
+      );
+    }
+    if (route === 'posture') {
+      return (
+        <PosturePage
+          lowPowerMode={data.settings.lowPowerMode}
+          onSummary={(summary) => setData((prev) => {
+            if (!prev) return prev;
+            const durationMin = summary.durationSec / 60;
+            const calories = Math.round(durationMin * (summary.exercise === 'pushup' ? 9 : 7));
+            return {
+              ...prev,
+              postureSessions: addPostureSession(prev.postureSessions, summary),
+              workoutSessions: addWorkoutSession(prev.workoutSessions, {
+                id: crypto.randomUUID(),
+                date: summary.endedAt,
+                workoutType: summary.exercise,
+                durationSec: summary.durationSec,
+                reps: summary.reps,
+                calories,
+                avgFormScore: summary.avgScore,
+              }),
+            };
+          })}
+        />
+      );
+    }
+    if (route === 'tracking') {
+      return <WorkoutHistoryPage sessions={data.workoutSessions} onDelete={(id) => setData((prev) => prev ? { ...prev, workoutSessions: prev.workoutSessions.filter((w) => w.id !== id) } : prev)} />;
+    }
+    if (route === 'workouts') return <WorkoutsPage plans={data.savedPlans} />;
+    return (
+      <SettingsPage
+        autoSpeak={data.settings.autoSpeak}
+        lowPowerMode={data.settings.lowPowerMode}
+        demoDataEnabled={data.settings.demoDataEnabled}
+        onToggleAutoSpeak={() => setData((prev) => prev ? { ...prev, settings: { ...prev.settings, autoSpeak: !prev.settings.autoSpeak } } : prev)}
+        onToggleLowPower={() => setData((prev) => prev ? { ...prev, settings: { ...prev.settings, lowPowerMode: !prev.settings.lowPowerMode } } : prev)}
+        onToggleDemoData={() => setData((prev) => {
+          if (!prev) return prev;
+          const enabled = !prev.settings.demoDataEnabled;
+          return {
+            ...prev,
+            settings: { ...prev.settings, demoDataEnabled: enabled },
+            workoutSessions: enabled ? [...createDemoWorkouts(), ...prev.workoutSessions] : prev.workoutSessions,
+          };
+        })}
+        onExport={() => {
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'health-fitness-export.json';
+          a.click();
+          pushToast('Exported local data to JSON.');
+        }}
+        modelStatus={getModelStatus()}
+      />
+    );
+  }, [route, data]);
+
+  if (!ready) return <div className="loading">Loading local app...</div>;
+  if (error) return <div className="loading">Failed: {error}</div>;
+  if (!data) return <div className="loading">No data.</div>;
+
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1>RunAnywhere AI</h1>
-        {accel && <span className="badge">{accel === 'webgpu' ? 'WebGPU' : 'CPU'}</span>}
-      </header>
-
-      <nav className="tab-bar">
-        <button className={activeTab === 'chat' ? 'active' : ''} onClick={() => setActiveTab('chat')}>
-          💬 Chat
-        </button>
-        <button className={activeTab === 'vision' ? 'active' : ''} onClick={() => setActiveTab('vision')}>
-          📷 Vision
-        </button>
-        <button className={activeTab === 'voice' ? 'active' : ''} onClick={() => setActiveTab('voice')}>
-          🎙️ Voice
-        </button>
-      </nav>
-
-      <main className="tab-content">
-        {activeTab === 'chat' && <ChatTab />}
-        {activeTab === 'vision' && <VisionTab />}
-        {activeTab === 'voice' && <VoiceTab />}
-      </main>
-    </div>
+    <AppShell route={route} onRouteChange={setRoute} darkMode={data.settings.darkMode} toggleDarkMode={() => setData((prev) => prev ? { ...prev, settings: { ...prev.settings, darkMode: !prev.settings.darkMode } } : prev)}>
+      <header className="topbar"><span>Acceleration: {accel ?? 'loading'}</span></header>
+      {content}
+      <div className="toast-stack" aria-live="polite">
+        {toasts.map((toast) => <div key={toast.id} className={`toast ${toast.kind}`}>{toast.text}</div>)}
+      </div>
+    </AppShell>
   );
 }
