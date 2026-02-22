@@ -6,6 +6,7 @@ import { DashboardPage, SettingsPage, WorkoutHistoryPage, WorkoutsPage } from '.
 import { addPostureSession, addWorkoutSession, createDemoWorkouts, loadData, saveData } from './lib/storage';
 import { getAccelerationMode, getModelStatus, init } from './lib/runanywhere';
 import type { StoredData } from './types/storage';
+import { NutritionPage } from './features/nutrition/NutritionPage';
 
 interface Toast {
   id: string;
@@ -71,7 +72,7 @@ export function App() {
     if (route === 'dashboard') {
       return <DashboardPage onNavigate={setRoute} />;
     }
-
+   if (route === 'nutrition') return <NutritionPage />;
     if (route === 'coach') {
       return (
         <CoachPage
