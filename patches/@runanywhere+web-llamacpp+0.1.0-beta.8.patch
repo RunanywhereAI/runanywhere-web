@@ -1,0 +1,10 @@
+diff --git a/node_modules/@runanywhere/web-llamacpp/dist/index.js b/node_modules/@runanywhere/web-llamacpp/dist/index.js
+index 4623981..b8874e9 100644
+--- a/node_modules/@runanywhere/web-llamacpp/dist/index.js
++++ b/node_modules/@runanywhere/web-llamacpp/dist/index.js
+@@ -35,4 +35,3 @@ export { EmbeddingsNormalize, EmbeddingsPooling } from './Extensions/RunAnywhere
+ export { VLMWorkerBridge } from './Infrastructure/VLMWorkerBridge';
+ export { VideoCapture } from './Infrastructure/VideoCapture';
+ export { startVLMWorkerRuntime } from './Infrastructure/VLMWorkerRuntime';
+-//# sourceMappingURL=index.js.map
+\ No newline at end of file
