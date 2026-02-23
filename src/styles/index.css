@@ -7,6 +7,10 @@
   --primary-soft: #dbeafe;
   --border: #e5e7eb;
   --danger: #dc2626;
+
+  /* ✅ FIX: RGB tokens for rgba(var(--card-rgb), x) usage */
+  --card-rgb: 255, 255, 255;
+  --bg-rgb: 243, 246, 251;
 }
 
 body.dark {
@@ -18,10 +22,18 @@ body.dark {
   --primary-soft: #172554;
   --border: #25304a;
   --danger: #ef4444;
+
+  /* ✅ FIX: RGB tokens in dark mode */
+  --card-rgb: 21, 28, 50;
+  --bg-rgb: 11, 16, 32;
 }
 
 * {
   box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
 }
 
 body {
@@ -78,51 +90,6 @@ textarea:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
-}
-
-/* ----- bottom navigation (app-like) ----- */
-.bottom-nav {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: var(--card);
-  border-top: 1px solid var(--border);
-  z-index: 40;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-@supports not (backdrop-filter: blur(10px)) {
-  .bottom-nav {
-    background: var(--card);
-  }
-}
-
-.bottom-nav button {
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  padding: 0.6rem 0.2rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.7rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: color 0.15s ease;
-}
-
-.bottom-nav button.active {
-  color: var(--primary);
-}
-
-.bottom-nav .navIcon {
-  font-size: 1.2rem;
-  line-height: 1;
 }
 
 /* ----- cards & surfaces ----- */
@@ -248,6 +215,7 @@ textarea {
   font-size: 0.95rem;
 }
 
+/* ✅ Keep global button style (your UI depends on it) */
 button {
   padding: 0.65rem 1rem;
   border-radius: 1rem;
@@ -282,6 +250,53 @@ button.danger {
   background: transparent !important;
   color: var(--text) !important;
   border: 1px solid var(--border) !important;
+}
+
+/* ✅ FIX: bottom navigation MUST come AFTER global button
+   so it doesn't get overridden */
+.bottom-nav {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(var(--card-rgb), 0.85);
+  border-top: 1px solid var(--border);
+  z-index: 40;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+@supports not (backdrop-filter: blur(10px)) {
+  .bottom-nav {
+    background: var(--card);
+  }
+}
+
+/* ✅ Strong override so global button never breaks bottom-nav */
+.bottom-nav button {
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--muted) !important;
+  padding: 0.6rem 0.2rem !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.bottom-nav button.active {
+  color: var(--primary) !important;
+}
+
+.bottom-nav .navIcon {
+  font-size: 1.2rem;
+  line-height: 1;
 }
 
 /* ----- badges & status ----- */
@@ -866,10 +881,11 @@ button.danger {
   inset: auto 0.75rem 0.75rem 0.75rem;
   padding: 0.75rem;
   border-radius: 1rem;
-  background: var(--card);
+
+  /* ✅ FIX: correct glass background */
+  background: rgba(var(--card-rgb), 0.90);
   border: 1px solid var(--border);
-  /* safe fallback if backdrop-filter not supported */
-  background: rgba(var(--card-rgb), 0.95);
+
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
@@ -1003,7 +1019,7 @@ button.danger {
 
 .toast {
   border: 1px solid var(--border);
-  background: var(--card);
+  background: rgba(var(--card-rgb), 0.88);
   padding: 0.75rem 1rem;
   border-radius: 1rem;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);

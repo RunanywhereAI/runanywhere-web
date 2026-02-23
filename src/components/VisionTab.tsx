@@ -1,8 +1,11 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { ModelCategory } from '@runanywhere/web';
-import { VideoCapture, VLMWorkerBridge } from '@runanywhere/web-llamacpp';
-import { useModelLoader } from '../hooks/useModelLoader';
-import { ModelBanner } from './ModelBanner';
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { ModelCategory } from "@runanywhere/web";
+import { useModelLoader } from "../hooks/useModelLoader";
+import { ModelBanner } from "./ModelBanner";
+
+// ⚠️ Depending on RunAnywhere version, these exports can differ.
+// If your build fails on this import, tell me your package versions and I’ll match it.
+import { VideoCapture, VLMWorkerBridge } from "@runanywhere/web-llamacpp";
 
 const LIVE_INTERVAL_MS = 2500;
 const LIVE_MAX_TOKENS = 30;
@@ -23,19 +26,23 @@ export function VisionTab() {
 
   const [result, setResult] = useState<VisionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [prompt, setPrompt] = useState('Describe what you see briefly.');
+  const [prompt, setPrompt] = useState("Describe what you see briefly.");
 
   const videoMountRef = useRef<HTMLDivElement>(null);
   const captureRef = useRef<VideoCapture | null>(null);
 
   const processingRef = useRef(false);
   const liveModeRef = useRef(false);
-
   const liveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // keep refs synced
-  useEffect(() => { processingRef.current = processing; }, [processing]);
-  useEffect(() => { liveModeRef.current = liveMode; }, [liveMode]);
+  // Keep refs synced
+  useEffect(() => {
+    processingRef.current = processing;
+  }, [processing]);
+
+  useEffect(() => {
+    liveModeRef.current = liveMode;
+  }, [liveMode]);
 
   const clearLiveTimer = useCallback(() => {
     if (liveTimerRef.current) {
@@ -45,28 +52,36 @@ export function VisionTab() {
   }, []);
 
   // ----------------------------
-  // Camera start/stop
+  // Camera start/stop (safe)
   // ----------------------------
   const startCamera = useCallback(async () => {
     if (captureRef.current?.isCapturing) return;
 
     setError(null);
 
-    const cam = new VideoCapture({ facingMode: 'user' }); // laptops generally have user camera
-    await cam.start();
-    captureRef.current = cam;
+    try {
+      const cam = new VideoCapture({ facingMode: "user" });
+      await cam.start();
 
-    const mount = videoMountRef.current;
-    if (mount) {
-      // IMPORTANT: clear mount first (prevents duplicate video elements)
-      mount.innerHTML = '';
-      const el = cam.videoElement;
-      el.style.width = '100%';
-      el.style.borderRadius = '12px';
-      mount.appendChild(el);
+      captureRef.current = cam;
+
+      const mount = videoMountRef.current;
+      if (mount) {
+        mount.innerHTML = "";
+        const el = cam.videoElement;
+
+        el.style.width = "100%";
+        el.style.borderRadius = "12px";
+
+        mount.appendChild(el);
+      }
+
+      setCameraActive(true);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(`Camera error: ${msg}`);
+      setCameraActive(false);
     }
-
-    setCameraActive(true);
   }, []);
 
   const stopCamera = useCallback(() => {
@@ -76,9 +91,18 @@ export function VisionTab() {
 
     const cam = captureRef.current;
     if (cam) {
-      cam.stop();
-      // remove video element safely
-      cam.videoElement.parentNode?.removeChild(cam.videoElement);
+      try {
+        cam.stop();
+      } catch {
+        // ignore
+      }
+
+      try {
+        cam.videoElement.parentNode?.removeChild(cam.videoElement);
+      } catch {
+        // ignore
+      }
+
       captureRef.current = null;
     }
 
@@ -87,7 +111,6 @@ export function VisionTab() {
     processingRef.current = false;
   }, [clearLiveTimer]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       stopCamera();
@@ -95,26 +118,32 @@ export function VisionTab() {
   }, [stopCamera]);
 
   // ----------------------------
-  // Ensure model + worker ready
+  // Ensure model + worker ready (version-safe)
   // ----------------------------
   const ensureVLMReady = useCallback(async () => {
-    // Ensure model loaded via your loader hook
-    if (loader.state !== 'ready') {
+    setError(null);
+
+    // 1) ensure multimodal model is loaded
+    if (loader.state !== "ready") {
       const ok = await loader.ensure();
-      if (!ok) return false;
+      if (!ok) {
+        setError(loader.error ?? "Failed to load VLM model.");
+        return false;
+      }
     }
 
-    // Ensure worker is initialized if needed
-    const bridge = VLMWorkerBridge.shared;
+    // 2) ensure worker is initialized (without assuming flags exist)
+    const bridge: any = VLMWorkerBridge.shared;
 
-    // Some versions use init() internally, some are already initialized.
-    // This is safe to try.
-    if (!bridge.isInitialized) {
-      try {
+    try {
+      // Some SDK versions need init(), some don’t.
+      if (typeof bridge.init === "function") {
         await bridge.init();
-      } catch {
-        // ignore; process() will still throw a meaningful error
       }
+    } catch (e) {
+      // don't block here; process() will throw a clearer message if needed
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(`Worker init warning: ${msg}`);
     }
 
     return true;
@@ -136,7 +165,10 @@ export function VisionTab() {
       if (!ready) return;
 
       const frame = cam.captureFrame(CAPTURE_DIM);
-      if (!frame) return;
+      if (!frame) {
+        setError("Failed to capture a frame from camera.");
+        return;
+      }
 
       setProcessing(true);
       processingRef.current = true;
@@ -144,10 +176,12 @@ export function VisionTab() {
       const t0 = performance.now();
 
       try {
-        const bridge = VLMWorkerBridge.shared;
+        const bridge: any = VLMWorkerBridge.shared;
 
-        // Do NOT hard-block on bridge.isModelLoaded (varies by version).
-        // Let process() be the source of truth.
+        if (typeof bridge.process !== "function") {
+          throw new Error("VLMWorkerBridge.process() not available in this SDK version.");
+        }
+
         const res = await bridge.process(
           frame.rgbPixels,
           frame.width,
@@ -156,12 +190,13 @@ export function VisionTab() {
           { maxTokens, temperature: 0.6 }
         );
 
-        setResult({ text: res.text, totalMs: performance.now() - t0 });
+        const text = res?.text ?? "";
+        setResult({ text: text || "(No text returned)", totalMs: performance.now() - t0 });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-
-        // If something crashes, stop live mode immediately to avoid infinite retries
         setError(msg);
+
+        // Stop live mode on failure to prevent infinite loops
         if (liveModeRef.current) {
           setLiveMode(false);
           liveModeRef.current = false;
@@ -175,32 +210,23 @@ export function VisionTab() {
     [prompt, ensureVLMReady, clearLiveTimer]
   );
 
-  // ----------------------------
-  // Single-shot
-  // ----------------------------
+  // Single shot
   const describeSingle = useCallback(async () => {
     if (!captureRef.current?.isCapturing) {
       await startCamera();
-      // Run one inference after camera starts (IMPORTANT)
-      await describeFrame(SINGLE_MAX_TOKENS);
-      return;
     }
     await describeFrame(SINGLE_MAX_TOKENS);
   }, [startCamera, describeFrame]);
 
-  // ----------------------------
-  // Live mode (safe loop)
-  // ----------------------------
+  // Live loop
   const liveTick = useCallback(async () => {
     if (!liveModeRef.current) return;
     if (!captureRef.current?.isCapturing) return;
 
-    // Skip if still processing
     if (!processingRef.current) {
       await describeFrame(LIVE_MAX_TOKENS);
     }
 
-    // schedule next tick only if still live
     if (liveModeRef.current) {
       liveTimerRef.current = setTimeout(() => {
         void liveTick();
@@ -218,7 +244,6 @@ export function VisionTab() {
     setLiveMode(true);
     liveModeRef.current = true;
 
-    // immediate tick
     void liveTick();
   }, [startCamera, liveTick, clearLiveTimer]);
 
@@ -233,11 +258,8 @@ export function VisionTab() {
     else void startLive();
   }, [startLive, stopLive]);
 
-  const liveLabel = useMemo(() => (liveMode ? 'Stop Live' : 'Start Live'), [liveMode]);
+  const liveLabel = useMemo(() => (liveMode ? "Stop Live" : "Start Live"), [liveMode]);
 
-  // ----------------------------
-  // Render (professional, no emojis)
-  // ----------------------------
   return (
     <div className="tab-panel vision-panel">
       <ModelBanner
@@ -283,11 +305,11 @@ export function VisionTab() {
               onClick={() => void describeSingle()}
               disabled={processing || liveMode}
             >
-              {processing && !liveMode ? 'Analyzing' : 'Describe'}
+              {processing && !liveMode ? "Analyzing" : "Describe"}
             </button>
 
             <button
-              className={liveMode ? 'btn btn-live-active' : 'btn'}
+              className={liveMode ? "btn btn-live-active" : "btn"}
               onClick={toggleLive}
               disabled={processing && !liveMode}
             >
