@@ -1,0 +1,10 @@
+diff --git a/node_modules/@runanywhere/web-onnx/dist/index.js b/node_modules/@runanywhere/web-onnx/dist/index.js
+index 075100f..4b56d2f 100644
+--- a/node_modules/@runanywhere/web-onnx/dist/index.js
++++ b/node_modules/@runanywhere/web-onnx/dist/index.js
+@@ -31,4 +31,3 @@ export { SherpaONNXBridge } from './Foundation/SherpaONNXBridge';
+ // Infrastructure
+ export { AudioCapture } from './Infrastructure/AudioCapture';
+ export { AudioPlayback } from './Infrastructure/AudioPlayback';
+-//# sourceMappingURL=index.js.map
+\ No newline at end of file
