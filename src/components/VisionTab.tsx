@@ -1,13 +1,16 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { ModelCategory } from '@runanywhere/web';
-import { VideoCapture, VLMWorkerBridge } from '@runanywhere/web-llamacpp';
-import { useModelLoader } from '../hooks/useModelLoader';
-import { ModelBanner } from './ModelBanner';
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { ModelCategory } from "@runanywhere/web";
+import { useModelLoader } from "../hooks/useModelLoader";
+import { ModelBanner } from "./ModelBanner";
+
+// ⚠️ Depending on RunAnywhere version, these exports can differ.
+// If your build fails on this import, tell me your package versions and I’ll match it.
+import { VideoCapture, VLMWorkerBridge } from "@runanywhere/web-llamacpp";
 
 const LIVE_INTERVAL_MS = 2500;
 const LIVE_MAX_TOKENS = 30;
 const SINGLE_MAX_TOKENS = 80;
-const CAPTURE_DIM = 256; // CLIP resizes internally; larger is wasted work
+const CAPTURE_DIM = 256;
 
 interface VisionResult {
   text: string;
@@ -16,41 +19,61 @@ interface VisionResult {
 
 export function VisionTab() {
   const loader = useModelLoader(ModelCategory.Multimodal);
+
   const [cameraActive, setCameraActive] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [liveMode, setLiveMode] = useState(false);
+
   const [result, setResult] = useState<VisionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [prompt, setPrompt] = useState('Describe what you see briefly.');
+  const [prompt, setPrompt] = useState("Describe what you see briefly.");
 
   const videoMountRef = useRef<HTMLDivElement>(null);
   const captureRef = useRef<VideoCapture | null>(null);
+
   const processingRef = useRef(false);
-  const liveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const liveModeRef = useRef(false);
+  const liveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Keep refs in sync with state so interval callbacks see latest values
-  processingRef.current = processing;
-  liveModeRef.current = liveMode;
+  // Keep refs synced
+  useEffect(() => {
+    processingRef.current = processing;
+  }, [processing]);
 
-  // ------------------------------------------------------------------
-  // Camera
-  // ------------------------------------------------------------------
+  useEffect(() => {
+    liveModeRef.current = liveMode;
+  }, [liveMode]);
+
+  const clearLiveTimer = useCallback(() => {
+    if (liveTimerRef.current) {
+      clearTimeout(liveTimerRef.current);
+      liveTimerRef.current = null;
+    }
+  }, []);
+
+  // ----------------------------
+  // Camera start/stop (safe)
+  // ----------------------------
   const startCamera = useCallback(async () => {
     if (captureRef.current?.isCapturing) return;
 
     setError(null);
 
     try {
-      const cam = new VideoCapture({ facingMode: 'environment' });
+      // Use back camera for posture/fitness (better than selfie cam)
+      const cam = new VideoCapture({ facingMode: "environment" });
       await cam.start();
+
       captureRef.current = cam;
 
       const mount = videoMountRef.current;
       if (mount) {
+        // Prevent duplicate video elements
+        mount.innerHTML = "";
+
         const el = cam.videoElement;
-        el.style.width = '100%';
-        el.style.borderRadius = '12px';
+        el.style.width = "100%";
+        el.style.borderRadius = "12px";
         mount.appendChild(el);
       }
 
@@ -58,104 +81,177 @@ export function VisionTab() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
 
-      if (msg.includes('NotAllowed') || msg.includes('Permission')) {
-        setError(
-          'Camera permission denied. On macOS, check System Settings → Privacy & Security → Camera and ensure your browser is allowed.',
-        );
-      } else if (msg.includes('NotFound') || msg.includes('DevicesNotFound')) {
-        setError('No camera found on this device.');
-      } else if (msg.includes('NotReadable') || msg.includes('TrackStartError')) {
-        setError('Camera is in use by another application.');
+      if (msg.includes("NotAllowed") || msg.includes("Permission")) {
+        setError("Camera permission denied. Please allow camera access in your browser/site settings.");
+      } else if (msg.includes("NotFound") || msg.includes("DevicesNotFound")) {
+        setError("No camera found on this device.");
+      } else if (msg.includes("NotReadable") || msg.includes("TrackStartError")) {
+        setError("Camera is in use by another application.");
       } else {
         setError(`Camera error: ${msg}`);
       }
+
+      setCameraActive(false);
     }
   }, []);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (liveIntervalRef.current) clearInterval(liveIntervalRef.current);
-      const cam = captureRef.current;
-      if (cam) {
-        cam.stop();
-        cam.videoElement.parentNode?.removeChild(cam.videoElement);
-        captureRef.current = null;
-      }
-    };
-  }, []);
-
-  // ------------------------------------------------------------------
-  // Core: capture + infer
-  // ------------------------------------------------------------------
-  const describeFrame = useCallback(async (maxTokens: number) => {
-    if (processingRef.current) return;
+  const stopCamera = useCallback(() => {
+    clearLiveTimer();
+    setLiveMode(false);
+    liveModeRef.current = false;
 
     const cam = captureRef.current;
-    if (!cam?.isCapturing) return;
+    if (cam) {
+      try {
+        cam.stop();
+      } catch {
+        // ignore
+      }
 
-    // Ensure model loaded
-    if (loader.state !== 'ready') {
-      const ok = await loader.ensure();
-      if (!ok) return;
+      try {
+        cam.videoElement.parentNode?.removeChild(cam.videoElement);
+      } catch {
+        // ignore
+      }
+
+      captureRef.current = null;
     }
 
-    const frame = cam.captureFrame(CAPTURE_DIM);
-    if (!frame) return;
+    setCameraActive(false);
+    setProcessing(false);
+    processingRef.current = false;
+  }, [clearLiveTimer]);
 
-    setProcessing(true);
-    processingRef.current = true;
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, [stopCamera]);
+
+  // ----------------------------
+  // Ensure model + worker ready (version-safe)
+  // ----------------------------
+  const ensureVLMReady = useCallback(async () => {
     setError(null);
 
-    const t0 = performance.now();
+    // 1) Ensure multimodal model is loaded
+    if (loader.state !== "ready") {
+      const ok = await loader.ensure();
+      if (!ok) {
+        setError(loader.error ?? "Failed to load VLM model.");
+        return false;
+      }
+    }
+
+    // 2) Ensure worker is initialized (without assuming flags exist)
+    const bridge: any = VLMWorkerBridge.shared;
 
     try {
-      const bridge = VLMWorkerBridge.shared;
-      if (!bridge.isModelLoaded) {
-        throw new Error('VLM model not loaded in worker');
+      // Some SDK versions need init(), some don’t.
+      if (typeof bridge.init === "function") {
+        await bridge.init();
       }
-
-      const res = await bridge.process(
-        frame.rgbPixels,
-        frame.width,
-        frame.height,
-        prompt,
-        { maxTokens, temperature: 0.6 },
-      );
-
-      setResult({ text: res.text, totalMs: performance.now() - t0 });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      const isWasmCrash = msg.includes('memory access out of bounds')
-        || msg.includes('RuntimeError');
-
-      if (isWasmCrash) {
-        setResult({ text: 'Recovering from memory error... next frame will retry.', totalMs: 0 });
-      } else {
-        setError(msg);
-        if (liveModeRef.current) stopLive();
-      }
-    } finally {
-      setProcessing(false);
-      processingRef.current = false;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(`Worker init warning: ${msg}`);
+      // Don't block; process() will throw a clearer message if needed.
     }
-  }, [loader, prompt]);
 
-  // ------------------------------------------------------------------
-  // Single-shot
-  // ------------------------------------------------------------------
+    return true;
+  }, [loader]);
+
+  // ----------------------------
+  // Core: capture + infer
+  // ----------------------------
+  const describeFrame = useCallback(
+    async (maxTokens: number) => {
+      if (processingRef.current) return;
+
+      const cam = captureRef.current;
+      if (!cam?.isCapturing) return;
+
+      setError(null);
+
+      const ready = await ensureVLMReady();
+      if (!ready) return;
+
+      // Capture frame safely
+      const frame = cam.captureFrame(CAPTURE_DIM);
+      if (!frame || !frame.rgbPixels) {
+        setError("Failed to capture a valid frame from camera.");
+        return;
+      }
+
+      setProcessing(true);
+      processingRef.current = true;
+
+      const t0 = performance.now();
+
+      try {
+        const bridge: any = VLMWorkerBridge.shared;
+
+        if (typeof bridge.process !== "function") {
+          throw new Error("VLMWorkerBridge.process() not available in this SDK version.");
+        }
+
+        const res = await bridge.process(
+          frame.rgbPixels,
+          frame.width,
+          frame.height,
+          prompt,
+          { maxTokens, temperature: 0.6 }
+        );
+
+        const text = res?.text ?? "";
+        setResult({
+          text: text || "(No text returned)",
+          totalMs: performance.now() - t0,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setError(msg);
+
+        // Stop live mode on failure to prevent infinite loops
+        if (liveModeRef.current) {
+          setLiveMode(false);
+          liveModeRef.current = false;
+          clearLiveTimer();
+        }
+      } finally {
+        setProcessing(false);
+        processingRef.current = false;
+      }
+    },
+    [prompt, ensureVLMReady, clearLiveTimer]
+  );
+
+  // Single shot
   const describeSingle = useCallback(async () => {
     if (!captureRef.current?.isCapturing) {
       await startCamera();
-      return;
     }
     await describeFrame(SINGLE_MAX_TOKENS);
   }, [startCamera, describeFrame]);
 
-  // ------------------------------------------------------------------
-  // Live mode
-  // ------------------------------------------------------------------
+  // Live loop
+  const liveTick = useCallback(async () => {
+    if (!liveModeRef.current) return;
+    if (!captureRef.current?.isCapturing) return;
+
+    if (!processingRef.current) {
+      await describeFrame(LIVE_MAX_TOKENS);
+    }
+
+    if (liveModeRef.current) {
+      liveTimerRef.current = setTimeout(() => {
+        void liveTick();
+      }, LIVE_INTERVAL_MS);
+    }
+  }, [describeFrame]);
+
   const startLive = useCallback(async () => {
+    clearLiveTimer();
+
     if (!captureRef.current?.isCapturing) {
       await startCamera();
     }
@@ -163,37 +259,22 @@ export function VisionTab() {
     setLiveMode(true);
     liveModeRef.current = true;
 
-    // Immediately describe first frame
-    describeFrame(LIVE_MAX_TOKENS);
-
-    // Then poll every 2.5s — skips ticks while inference is running
-    liveIntervalRef.current = setInterval(() => {
-      if (!processingRef.current && liveModeRef.current) {
-        describeFrame(LIVE_MAX_TOKENS);
-      }
-    }, LIVE_INTERVAL_MS);
-  }, [startCamera, describeFrame]);
+    void liveTick();
+  }, [startCamera, liveTick, clearLiveTimer]);
 
   const stopLive = useCallback(() => {
     setLiveMode(false);
     liveModeRef.current = false;
-    if (liveIntervalRef.current) {
-      clearInterval(liveIntervalRef.current);
-      liveIntervalRef.current = null;
-    }
-  }, []);
+    clearLiveTimer();
+  }, [clearLiveTimer]);
 
   const toggleLive = useCallback(() => {
-    if (liveMode) {
-      stopLive();
-    } else {
-      startLive();
-    }
-  }, [liveMode, startLive, stopLive]);
+    if (liveModeRef.current) stopLive();
+    else void startLive();
+  }, [startLive, stopLive]);
 
-  // ------------------------------------------------------------------
-  // Render
-  // ------------------------------------------------------------------
+  const liveLabel = useMemo(() => (liveMode ? "Stop Live" : "Start Live"), [liveMode]);
+
   return (
     <div className="tab-panel vision-panel">
       <ModelBanner
@@ -207,8 +288,8 @@ export function VisionTab() {
       <div className="vision-camera">
         {!cameraActive && (
           <div className="empty-state">
-            <h3>📷 Camera Preview</h3>
-            <p>Tap below to start the camera</p>
+            <h3>Camera Preview</h3>
+            <p>Start the camera to capture frames for analysis.</p>
           </div>
         )}
         <div ref={videoMountRef} />
@@ -217,7 +298,7 @@ export function VisionTab() {
       <input
         className="vision-prompt"
         type="text"
-        placeholder="What do you want to know about the image?"
+        placeholder="Prompt for the image"
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
         disabled={liveMode}
@@ -225,22 +306,29 @@ export function VisionTab() {
 
       <div className="vision-actions">
         {!cameraActive ? (
-          <button className="btn btn-primary" onClick={startCamera}>Start Camera</button>
+          <button className="btn btn-primary" onClick={() => void startCamera()}>
+            Start Camera
+          </button>
         ) : (
           <>
+            <button className="btn" onClick={stopCamera} disabled={processing}>
+              Stop Camera
+            </button>
+
             <button
               className="btn btn-primary"
-              onClick={describeSingle}
+              onClick={() => void describeSingle()}
               disabled={processing || liveMode}
             >
-              {processing && !liveMode ? 'Analyzing...' : 'Describe'}
+              {processing && !liveMode ? "Analyzing" : "Describe"}
             </button>
+
             <button
-              className={`btn ${liveMode ? 'btn-live-active' : ''}`}
+              className={liveMode ? "btn btn-live-active" : "btn"}
               onClick={toggleLive}
               disabled={processing && !liveMode}
             >
-              {liveMode ? '⏹ Stop Live' : '▶ Live'}
+              {liveLabel}
             </button>
           </>
         )}
@@ -254,11 +342,10 @@ export function VisionTab() {
 
       {result && (
         <div className="vision-result">
-          {liveMode && <span className="live-badge">LIVE</span>}
           <h4>Result</h4>
           <p>{result.text}</p>
           {result.totalMs > 0 && (
-            <div className="message-stats">{(result.totalMs / 1000).toFixed(1)}s</div>
+            <div className="message-stats">{(result.totalMs / 1000).toFixed(1)} s</div>
           )}
         </div>
       )}
