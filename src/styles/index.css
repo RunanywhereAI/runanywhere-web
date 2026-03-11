@@ -700,3 +700,204 @@ body {
 }
 
 .text-muted { color: var(--text-muted); font-size: 13px; }
+
+/* ---------------------------------------------------------------------------
+ * Posture tab
+ * --------------------------------------------------------------------------- */
+
+.posture-panel { 
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.posture-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+}
+
+.posture-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.posture-header h2 {
+  font-size: 20px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.posture-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.camera-container {
+  flex: 1;
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  overflow: hidden;
+  position: relative;
+  min-height: 300px;
+}
+
+.camera-container.camera-hidden .camera-feed {
+  display: none;
+}
+
+.camera-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-card);
+}
+
+.camera-placeholder p {
+  color: var(--text-muted);
+  font-size: 16px;
+}
+
+.camera-feed {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1); /* Mirror the camera feed */
+}
+
+.status-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.status-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.status-item:last-child {
+  border-bottom: none;
+}
+
+.status-label {
+  font-size: 14px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.status-value {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.status-value.good {
+  color: var(--green);
+}
+
+.status-value.bad {
+  color: var(--red);
+}
+
+.status-value.suggestion {
+  color: var(--text);
+  font-style: italic;
+}
+
+.status-value.score {
+  font-size: 18px;
+}
+
+.status-value.count {
+  color: var(--text);
+}
+
+.status-value.timer {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  letter-spacing: 0.5px;
+}
+
+.break-alert {
+  background: var(--bg-input);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+  border: 1px solid var(--primary);
+}
+
+.break-alert p {
+  color: var(--text);
+  margin-bottom: 16px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.break-alert .btn {
+  width: 100%;
+  padding: 12px;
+  font-size: 14px;
+}
+
+/* Camera Error Styling */
+.camera-error {
+  background: var(--bg-input);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+  border: 1px solid var(--red);
+  margin-bottom: 16px;
+}
+
+.camera-error p {
+  color: var(--text);
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.camera-error ul {
+  text-align: left;
+  display: inline-block;
+  margin-bottom: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.camera-error li {
+  margin-bottom: 4px;
+}
+
+/* Camera Loading Styling */
+.camera-loading {
+  background: var(--bg-input);
+  border-radius: var(--radius);
+  padding: 24px;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.camera-loading p {
+  color: var(--text);
+  margin-bottom: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+}

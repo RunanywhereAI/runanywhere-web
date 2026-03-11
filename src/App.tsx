@@ -4,8 +4,9 @@ import { ChatTab } from './components/ChatTab';
 import { VisionTab } from './components/VisionTab';
 import { VoiceTab } from './components/VoiceTab';
 import { ToolsTab } from './components/ToolsTab';
+import { PostureTab } from './components/PostureTab';
 
-type Tab = 'chat' | 'vision' | 'voice' | 'tools';
+type Tab = 'chat' | 'vision' | 'voice' | 'tools' | 'posture';
 
 export function App() {
   const [sdkReady, setSdkReady] = useState(false);
@@ -59,6 +60,9 @@ export function App() {
         <button className={activeTab === 'tools' ? 'active' : ''} onClick={() => setActiveTab('tools')}>
           🔧 Tools
         </button>
+        <button className={activeTab === 'posture' ? 'active' : ''} onClick={() => setActiveTab('posture')}>
+          🧍 Posture
+        </button>
       </nav>
 
       <main className="tab-content">
@@ -66,6 +70,7 @@ export function App() {
         {activeTab === 'vision' && <VisionTab />}
         {activeTab === 'voice' && <VoiceTab />}
         {activeTab === 'tools' && <ToolsTab />}
+        {activeTab === 'posture' && <PostureTab />}
       </main>
     </div>
   );
