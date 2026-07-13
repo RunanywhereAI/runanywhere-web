@@ -1,45 +1,103 @@
-import { ModelCategory } from '@runanywhere/web';
 import {
-  ToolCalling,
-  ToolCallFormat,
-  toToolValue,
-  getStringArg,
-  getNumberArg,
-  type ToolDefinition,
+  ModelCategory,
+  RunAnywhere,
+  ToolCallFormatName,
+  ToolParameterType,
   type ToolCall,
-  type ToolResult,
   type ToolCallingResult,
+  type ToolDefinition,
+  type ToolResult,
   type ToolValue,
-} from '@runanywhere/web-llamacpp';
+} from '@runanywhere/web';
 import { useState, useRef, useEffect, useCallback } from 'react';
 
 import { useModelLoader } from '../hooks/useModelLoader';
 import { ModelBanner } from './ModelBanner';
 
 // ---------------------------------------------------------------------------
+// ToolValue helpers — hand-rolled (the web-llamacpp toToolValue/getStringArg/
+// getNumberArg helpers were removed; the proto ToolValue oneof is trivial to
+// build/read directly).
+// ---------------------------------------------------------------------------
+
+function tv(value: string | number | boolean): ToolValue {
+  if (typeof value === 'string') return { stringValue: value };
+  if (typeof value === 'number') return { numberValue: value };
+  return { boolValue: value };
+}
+
+function toolValueString(value: ToolValue | undefined): string | null {
+  if (!value) return null;
+  if (value.stringValue !== undefined) return value.stringValue;
+  if (value.numberValue !== undefined) return String(value.numberValue);
+  return null;
+}
+
+function toolValueNumber(value: ToolValue | undefined): number | null {
+  if (!value) return null;
+  if (value.numberValue !== undefined) return value.numberValue;
+  if (value.stringValue !== undefined) {
+    const parsed = Number(value.stringValue);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+/** Readable label for a ToolParameterType wire value. */
+function paramTypeLabel(type: ToolParameterType): string {
+  switch (type) {
+    case ToolParameterType.TOOL_PARAMETER_TYPE_STRING: return 'string';
+    case ToolParameterType.TOOL_PARAMETER_TYPE_NUMBER: return 'number';
+    case ToolParameterType.TOOL_PARAMETER_TYPE_BOOLEAN: return 'boolean';
+    case ToolParameterType.TOOL_PARAMETER_TYPE_OBJECT: return 'object';
+    case ToolParameterType.TOOL_PARAMETER_TYPE_ARRAY: return 'array';
+    default: return 'unknown';
+  }
+}
+
+/** Best-effort readable JSON summary of a ToolCall/ToolResult JSON payload. */
+function summarizeJson(json: string | undefined): string {
+  if (!json) return '{}';
+  try {
+    return JSON.stringify(JSON.parse(json), null, 2);
+  } catch {
+    return json;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Built-in demo tools
 // ---------------------------------------------------------------------------
 
-const DEMO_TOOLS: { def: ToolDefinition; executor: Parameters<typeof ToolCalling.registerTool>[1] }[] = [
+type ToolExecutor = Parameters<typeof RunAnywhere.toolCalling.registerTool>[1];
+
+const DEMO_TOOLS: { def: ToolDefinition; executor: ToolExecutor }[] = [
   {
     def: {
       name: 'get_weather',
       description: 'Gets the current weather for a city. Returns temperature in Fahrenheit and a short condition.',
       parameters: [
-        { name: 'location', type: 'string', description: 'City name (e.g. "San Francisco")', required: true },
+        {
+          name: 'location',
+          type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
+          description: 'City name (e.g. "San Francisco")',
+          required: true,
+          enumValues: [],
+        },
       ],
       category: 'Utility',
+      metadata: {},
     },
     executor: async (args) => {
-      const city = getStringArg(args, 'location') ?? 'Unknown';
+      const city = toolValueString(args.location) ?? 'Unknown';
       const conditions = ['Sunny', 'Partly Cloudy', 'Overcast', 'Rainy', 'Windy', 'Foggy'];
       const temp = Math.round(45 + Math.random() * 50);
       const condition = conditions[Math.floor(Math.random() * conditions.length)];
       return {
-        location: toToolValue(city),
-        temperature_f: toToolValue(temp),
-        condition: toToolValue(condition),
-        humidity_pct: toToolValue(Math.round(30 + Math.random() * 60)),
+        location: tv(city),
+        temperature_f: tv(temp),
+        condition: tv(condition),
+        humidity_pct: tv(Math.round(30 + Math.random() * 60)),
       };
     },
   },
@@ -48,18 +106,25 @@ const DEMO_TOOLS: { def: ToolDefinition; executor: Parameters<typeof ToolCalling
       name: 'calculate',
       description: 'Evaluates a mathematical expression and returns the numeric result.',
       parameters: [
-        { name: 'expression', type: 'string', description: 'Math expression (e.g. "2 + 3 * 4")', required: true },
+        {
+          name: 'expression',
+          type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
+          description: 'Math expression (e.g. "2 + 3 * 4")',
+          required: true,
+          enumValues: [],
+        },
       ],
       category: 'Math',
+      metadata: {},
     },
     executor: async (args): Promise<Record<string, ToolValue>> => {
-      const expr = getStringArg(args, 'expression') ?? '0';
+      const expr = toolValueString(args.expression) ?? '0';
       try {
         const sanitized = expr.replace(/[^0-9+\-*/().%\s^]/g, '');
         const val = Function(`"use strict"; return (${sanitized})`)();
-        return { result: toToolValue(Number(val)), expression: toToolValue(expr) };
+        return { result: tv(Number(val)), expression: tv(expr) };
       } catch {
-        return { error: toToolValue(`Invalid expression: ${expr}`) };
+        return { error: tv(`Invalid expression: ${expr}`) };
       }
     },
   },
@@ -68,18 +133,25 @@ const DEMO_TOOLS: { def: ToolDefinition; executor: Parameters<typeof ToolCalling
       name: 'get_time',
       description: 'Returns the current date and time, optionally for a specific timezone.',
       parameters: [
-        { name: 'timezone', type: 'string', description: 'IANA timezone (e.g. "America/New_York"). Defaults to UTC.', required: false },
+        {
+          name: 'timezone',
+          type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
+          description: 'IANA timezone (e.g. "America/New_York"). Defaults to UTC.',
+          required: false,
+          enumValues: [],
+        },
       ],
       category: 'Utility',
+      metadata: {},
     },
     executor: async (args): Promise<Record<string, ToolValue>> => {
-      const tz = getStringArg(args, 'timezone') ?? 'UTC';
+      const tz = toolValueString(args.timezone) ?? 'UTC';
       try {
         const now = new Date();
         const formatted = now.toLocaleString('en-US', { timeZone: tz, dateStyle: 'full', timeStyle: 'long' });
-        return { datetime: toToolValue(formatted), timezone: toToolValue(tz) };
+        return { datetime: tv(formatted), timezone: tv(tz) };
       } catch {
-        return { datetime: toToolValue(new Date().toISOString()), timezone: toToolValue('UTC'), note: toToolValue('Fell back to UTC — invalid timezone') };
+        return { datetime: tv(new Date().toISOString()), timezone: tv('UTC'), note: tv('Fell back to UTC — invalid timezone') };
       }
     },
   },
@@ -88,16 +160,29 @@ const DEMO_TOOLS: { def: ToolDefinition; executor: Parameters<typeof ToolCalling
       name: 'random_number',
       description: 'Generates a random integer between min and max (inclusive).',
       parameters: [
-        { name: 'min', type: 'number', description: 'Minimum value', required: true },
-        { name: 'max', type: 'number', description: 'Maximum value', required: true },
+        {
+          name: 'min',
+          type: ToolParameterType.TOOL_PARAMETER_TYPE_NUMBER,
+          description: 'Minimum value',
+          required: true,
+          enumValues: [],
+        },
+        {
+          name: 'max',
+          type: ToolParameterType.TOOL_PARAMETER_TYPE_NUMBER,
+          description: 'Maximum value',
+          required: true,
+          enumValues: [],
+        },
       ],
       category: 'Math',
+      metadata: {},
     },
     executor: async (args) => {
-      const min = getNumberArg(args, 'min') ?? 1;
-      const max = getNumberArg(args, 'max') ?? 100;
+      const min = toolValueNumber(args.min) ?? 1;
+      const max = toolValueNumber(args.max) ?? 100;
       const value = Math.floor(Math.random() * (max - min + 1)) + min;
-      return { value: toToolValue(value), min: toToolValue(min), max: toToolValue(max) };
+      return { value: tv(value), min: tv(min), max: tv(max) };
     },
   },
 ];
@@ -125,12 +210,18 @@ interface ParamDraft {
 
 const EMPTY_PARAM: ParamDraft = { name: '', type: 'string', description: '', required: true };
 
+const PARAM_TYPE_WIRE: Record<ParamDraft['type'], ToolParameterType> = {
+  string: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
+  number: ToolParameterType.TOOL_PARAMETER_TYPE_NUMBER,
+  boolean: ToolParameterType.TOOL_PARAMETER_TYPE_BOOLEAN,
+};
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 export function ToolsTab() {
-  const loader = useModelLoader(ModelCategory.Language);
+  const loader = useModelLoader(ModelCategory.MODEL_CATEGORY_LANGUAGE);
   const [input, setInput] = useState('');
   const [generating, setGenerating] = useState(false);
   const [autoExecute, setAutoExecute] = useState(true);
@@ -147,12 +238,12 @@ export function ToolsTab() {
 
   // Register demo tools on mount
   useEffect(() => {
-    ToolCalling.clearTools();
+    RunAnywhere.toolCalling.clearTools();
     for (const { def, executor } of DEMO_TOOLS) {
-      ToolCalling.registerTool(def, executor);
+      RunAnywhere.toolCalling.registerTool(def, executor);
     }
-    setRegisteredTools(ToolCalling.getRegisteredTools());
-    return () => { ToolCalling.clearTools(); };
+    setRegisteredTools(RunAnywhere.toolCalling.getRegisteredTools());
+    return () => { RunAnywhere.toolCalling.clearTools(); };
   }, []);
 
   // Auto-scroll trace
@@ -161,7 +252,7 @@ export function ToolsTab() {
   }, [trace]);
 
   const refreshRegistry = useCallback(() => {
-    setRegisteredTools(ToolCalling.getRegisteredTools());
+    setRegisteredTools(RunAnywhere.toolCalling.getRegisteredTools());
   }, []);
 
   // -------------------------------------------------------------------------
@@ -182,12 +273,12 @@ export function ToolsTab() {
     setTrace([{ type: 'user', content: text }]);
 
     try {
-      const result: ToolCallingResult = await ToolCalling.generateWithTools(text, {
+      const result: ToolCallingResult = await RunAnywhere.generateWithTools(text, {
         autoExecute,
         maxToolCalls: 5,
         temperature: 0.3,
         maxTokens: 512,
-        format: ToolCallFormat.Default,
+        format: ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON,
       });
 
       // Build trace from result
@@ -195,20 +286,18 @@ export function ToolsTab() {
 
       for (let i = 0; i < result.toolCalls.length; i++) {
         const call = result.toolCalls[i];
-        const argSummary = Object.entries(call.arguments)
-          .map(([k, v]) => `${k}=${JSON.stringify('value' in v ? v.value : v)}`)
+        const argSummary = Object.entries(JSON.parse(call.argumentsJson || '{}') as Record<string, unknown>)
+          .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
           .join(', ');
         steps.push({
           type: 'tool_call',
-          content: `${call.toolName}(${argSummary})`,
+          content: `${call.name}(${argSummary})`,
           detail: call,
         });
 
         if (result.toolResults[i]) {
           const res = result.toolResults[i];
-          const resultStr = res.success && res.result
-            ? JSON.stringify(Object.fromEntries(Object.entries(res.result).map(([k, v]) => [k, 'value' in v ? v.value : v])), null, 2)
-            : res.error ?? 'Unknown error';
+          const resultStr = res.success ? summarizeJson(res.resultJson) : (res.error ?? 'Unknown error');
           steps.push({
             type: 'tool_result',
             content: res.success ? resultStr : `Error: ${resultStr}`,
@@ -253,18 +342,19 @@ export function ToolsTab() {
       .filter((p) => p.name.trim())
       .map((p) => ({
         name: p.name.trim(),
-        type: p.type as 'string' | 'number' | 'boolean',
+        type: PARAM_TYPE_WIRE[p.type],
         description: p.description.trim() || p.name.trim(),
         required: p.required,
+        enumValues: [],
       }));
 
-    const def: ToolDefinition = { name, description: desc, parameters: params, category: 'Custom' };
+    const def: ToolDefinition = { name, description: desc, parameters: params, category: 'Custom', metadata: {} };
 
     // Mock executor that returns the args back as acknowledgement
-    const executor = async (args: Record<string, ToolValue>): Promise<Record<string, ToolValue>> => {
+    const executor: ToolExecutor = async (args) => {
       const result: Record<string, ToolValue> = {
-        status: toToolValue('executed'),
-        tool: toToolValue(name),
+        status: tv('executed'),
+        tool: tv(name),
       };
       for (const [k, v] of Object.entries(args)) {
         result[`input_${k}`] = v;
@@ -272,7 +362,7 @@ export function ToolsTab() {
       return result;
     };
 
-    ToolCalling.registerTool(def, executor);
+    RunAnywhere.toolCalling.registerTool(def, executor);
     refreshRegistry();
     setToolName('');
     setToolDesc('');
@@ -281,7 +371,7 @@ export function ToolsTab() {
   };
 
   const unregisterTool = (name: string) => {
-    ToolCalling.unregisterTool(name);
+    RunAnywhere.toolCalling.unregisterTool(name);
     refreshRegistry();
   };
 
@@ -336,7 +426,7 @@ export function ToolsTab() {
                 <div className="tool-params">
                   {t.parameters.map((p) => (
                     <span key={p.name} className="tool-param">
-                      {p.name}: {p.type}{p.required ? ' *' : ''}
+                      {p.name}: {paramTypeLabel(p.type)}{p.required ? ' *' : ''}
                     </span>
                   ))}
                 </div>

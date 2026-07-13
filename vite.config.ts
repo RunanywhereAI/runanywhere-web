@@ -7,15 +7,30 @@ import { fileURLToPath } from 'url';
 const __dir = path.dirname(fileURLToPath(import.meta.url));
 
 /**
- * Copies WASM binaries from the @runanywhere npm packages into dist/assets/
- * so they're served alongside the bundled JS at runtime.
+ * Copies the four canonical Emscripten WASM artifacts from the @runanywhere
+ * npm packages into dist/assets/ so they're served alongside the bundled JS
+ * at runtime.
  *
- * In dev mode, Vite serves node_modules directly so this only
- * matters for production builds.
+ * In dev mode, Vite serves node_modules directly so this only matters for
+ * production builds.
+ *
+ * Four JS/WASM artifact pairs ship across three SDK packages:
+ *   - `racommons.{js,wasm}` (commons core, owned by `@runanywhere/web`)
+ *   - `racommons-llamacpp.{js,wasm}` (CPU LLM/VLM backend)
+ *   - `racommons-llamacpp-webgpu.{js,wasm}` (WebGPU LLM/VLM backend)
+ *   - `racommons-onnx-sherpa.{js,wasm}` (STT/TTS/VAD via Sherpa-ONNX)
  */
 function copyWasmPlugin(): Plugin {
+  const coreWasm = path.resolve(__dir, 'node_modules/@runanywhere/web/wasm');
   const llamacppWasm = path.resolve(__dir, 'node_modules/@runanywhere/web-llamacpp/wasm');
   const onnxWasm = path.resolve(__dir, 'node_modules/@runanywhere/web-onnx/wasm');
+
+  const wasmArtifacts = [
+    { directory: coreWasm, baseName: 'racommons' },
+    { directory: llamacppWasm, baseName: 'racommons-llamacpp' },
+    { directory: llamacppWasm, baseName: 'racommons-llamacpp-webgpu' },
+    { directory: onnxWasm, baseName: 'racommons-onnx-sherpa' },
+  ] as const;
 
   return {
     name: 'copy-wasm',
@@ -24,35 +39,17 @@ function copyWasmPlugin(): Plugin {
       const assetsDir = path.join(outDir, 'assets');
       fs.mkdirSync(assetsDir, { recursive: true });
 
-      // LlamaCpp WASM binaries (LLM/VLM)
-      const llamacppFiles = [
-        { src: 'racommons-llamacpp.wasm', dest: 'racommons-llamacpp.wasm' },
-        { src: 'racommons-llamacpp.js', dest: 'racommons-llamacpp.js' },
-        { src: 'racommons-llamacpp-webgpu.wasm', dest: 'racommons-llamacpp-webgpu.wasm' },
-        { src: 'racommons-llamacpp-webgpu.js', dest: 'racommons-llamacpp-webgpu.js' },
-      ];
-
-      for (const { src, dest } of llamacppFiles) {
-        const srcPath = path.join(llamacppWasm, src);
-        if (fs.existsSync(srcPath)) {
-          fs.copyFileSync(srcPath, path.join(assetsDir, dest));
-          const sizeMB = (fs.statSync(srcPath).size / 1_000_000).toFixed(1);
-          console.log(`  ✓ Copied ${dest} (${sizeMB} MB)`);
-        } else {
-          console.warn(`  ⚠ Not found: ${srcPath}`);
-        }
-      }
-
-      // Sherpa-ONNX: copy all files in sherpa/ subdirectory (STT/TTS/VAD)
-      const sherpaDir = path.join(onnxWasm, 'sherpa');
-      const sherpaOut = path.join(assetsDir, 'sherpa');
-      if (fs.existsSync(sherpaDir)) {
-        fs.mkdirSync(sherpaOut, { recursive: true });
-        for (const file of fs.readdirSync(sherpaDir)) {
-          const src = path.join(sherpaDir, file);
-          fs.copyFileSync(src, path.join(sherpaOut, file));
-          const sizeMB = (fs.statSync(src).size / 1_000_000).toFixed(1);
-          console.log(`  ✓ Copied sherpa/${file} (${sizeMB} MB)`);
+      for (const { directory, baseName } of wasmArtifacts) {
+        for (const extension of ['js', 'wasm'] as const) {
+          const srcPath = path.join(directory, `${baseName}.${extension}`);
+          const destPath = path.join(assetsDir, `${baseName}.${extension}`);
+          if (fs.existsSync(srcPath)) {
+            fs.copyFileSync(srcPath, destPath);
+            const sizeMB = (fs.statSync(srcPath).size / 1_000_000).toFixed(1);
+            console.log(`  ✓ Copied ${baseName}.${extension} (${sizeMB} MB)`);
+          } else {
+            console.warn(`  ⚠ Not found: ${srcPath}`);
+          }
         }
       }
     },
@@ -75,6 +72,6 @@ export default defineConfig({
     // Exclude WASM-bearing packages from pre-bundling so their
     // import.meta.url resolves correctly to node_modules paths
     // (needed for automatic WASM file discovery at ../../wasm/).
-    exclude: ['@runanywhere/web-llamacpp', '@runanywhere/web-onnx'],
+    exclude: ['@runanywhere/web', '@runanywhere/web-llamacpp', '@runanywhere/web-onnx'],
   },
 });
