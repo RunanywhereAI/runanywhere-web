@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { ModelCategory } from '@runanywhere/web';
-import { TextGeneration } from '@runanywhere/web-llamacpp';
+import { ModelCategory, RunAnywhere } from '@runanywhere/web';
 import { useModelLoader } from '../hooks/useModelLoader';
 import { ModelBanner } from './ModelBanner';
 
@@ -11,7 +10,7 @@ interface Message {
 }
 
 export function ChatTab() {
-  const loader = useModelLoader(ModelCategory.Language);
+  const loader = useModelLoader(ModelCategory.MODEL_CATEGORY_LANGUAGE);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [generating, setGenerating] = useState(false);
@@ -42,14 +41,15 @@ export function ChatTab() {
     setMessages((prev) => [...prev, { role: 'assistant', text: '' }]);
 
     try {
-      const { stream, result: resultPromise, cancel } = await TextGeneration.generateStream(text, {
+      const stream = await RunAnywhere.generateStream({
+        prompt: text,
         maxTokens: 512,
         temperature: 0.7,
       });
-      cancelRef.current = cancel;
+      cancelRef.current = stream.cancel;
 
       let accumulated = '';
-      for await (const token of stream) {
+      for await (const token of stream.stream) {
         accumulated += token;
         setMessages((prev) => {
           const updated = [...prev];
@@ -58,16 +58,16 @@ export function ChatTab() {
         });
       }
 
-      const result = await resultPromise;
+      const result = await stream.result;
       setMessages((prev) => {
         const updated = [...prev];
         updated[assistantIdx] = {
           role: 'assistant',
           text: result.text || accumulated,
           stats: {
-            tokens: result.tokensUsed,
+            tokens: result.tokensGenerated,
             tokPerSec: result.tokensPerSecond,
-            latencyMs: result.latencyMs,
+            latencyMs: result.generationTimeMs,
           },
         };
         return updated;

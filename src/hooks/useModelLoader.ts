@@ -1,5 +1,10 @@
 import { useState, useCallback, useRef } from 'react';
-import { ModelManager, ModelCategory, EventBus } from '@runanywhere/web';
+import {
+  RunAnywhere,
+  ModelCategory,
+  modelInfoIsAvailableForUse,
+  type ModelInfo,
+} from '@runanywhere/web';
 
 export type LoaderState = 'idle' | 'downloading' | 'loading' | 'ready' | 'error';
 
@@ -10,16 +15,34 @@ interface ModelLoaderResult {
   ensure: () => Promise<boolean>;
 }
 
+/** True when the C++ lifecycle reports a loaded model for `category`. */
+function isCategoryLoaded(category: ModelCategory): boolean {
+  try {
+    return Boolean(
+      RunAnywhere.currentModel({ category, includeModelMetadata: false })?.found,
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** First catalog-registered model for `category`, or `null` if none. */
+function findModelForCategory(category: ModelCategory): ModelInfo | null {
+  const models = RunAnywhere.listModels()?.models ?? [];
+  return models.find((model) => model.category === category) ?? null;
+}
+
 /**
- * Hook to download + load models for a given category.
- * Tracks download progress and loading state.
+ * Hook to download + load a model for a given category.
+ * Tracks download progress and loading state. A category has one native
+ * "current" model — loading a new model in the same category replaces the
+ * previous one, while different categories (LLM/STT/TTS/VAD) coexist.
  *
  * @param category - Which model category to ensure is loaded.
- * @param coexist  - If true, only unload same-category models (allows STT+LLM+TTS to coexist).
  */
-export function useModelLoader(category: ModelCategory, coexist = false): ModelLoaderResult {
+export function useModelLoader(category: ModelCategory): ModelLoaderResult {
   const [state, setState] = useState<LoaderState>(() =>
-    ModelManager.getLoadedModel(category) ? 'ready' : 'idle',
+    isCategoryLoaded(category) ? 'ready' : 'idle',
   );
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +50,7 @@ export function useModelLoader(category: ModelCategory, coexist = false): ModelL
 
   const ensure = useCallback(async (): Promise<boolean> => {
     // Already loaded
-    if (ModelManager.getLoadedModel(category)) {
+    if (isCategoryLoaded(category)) {
       setState('ready');
       return true;
     }
@@ -36,43 +59,43 @@ export function useModelLoader(category: ModelCategory, coexist = false): ModelL
     loadingRef.current = true;
 
     try {
-      // Find a model for this category
-      const models = ModelManager.getModels().filter((m) => m.modality === category);
-      if (models.length === 0) {
+      const model = findModelForCategory(category);
+      if (!model) {
         setError(`No ${category} model registered`);
         setState('error');
         return false;
       }
 
-      const model = models[0];
-
       // Download if needed
-      if (model.status !== 'downloaded' && model.status !== 'loaded') {
+      if (!modelInfoIsAvailableForUse(model)) {
         setState('downloading');
         setProgress(0);
 
-        const unsub = EventBus.shared.on('model.downloadProgress', (evt) => {
-          if (evt.modelId === model.id) {
-            setProgress(evt.progress ?? 0);
-          }
+        await RunAnywhere.downloadModel({
+          modelId: model.id,
+          model,
+          onProgress: (next) => {
+            setProgress(Math.max(0, Math.min(1, next.overallProgress)));
+          },
         });
-
-        await ModelManager.downloadModel(model.id);
-        unsub();
         setProgress(1);
       }
 
       // Load
       setState('loading');
-      const ok = await ModelManager.loadModel(model.id, { coexist });
-      if (ok) {
+      const result = await RunAnywhere.loadModel({
+        modelId: model.id,
+        forceReload: false,
+        validateAvailability: true,
+      });
+      if (result?.success) {
         setState('ready');
         return true;
-      } else {
-        setError('Failed to load model');
-        setState('error');
-        return false;
       }
+
+      setError(result?.errorMessage || 'Failed to load model');
+      setState('error');
+      return false;
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setState('error');
@@ -80,7 +103,7 @@ export function useModelLoader(category: ModelCategory, coexist = false): ModelL
     } finally {
       loadingRef.current = false;
     }
-  }, [category, coexist]);
+  }, [category]);
 
   return { state, progress, error, ensure };
 }

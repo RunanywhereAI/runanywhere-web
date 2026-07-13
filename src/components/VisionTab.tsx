@@ -1,6 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { ModelCategory, VideoCapture } from '@runanywhere/web';
-import { VLMWorkerBridge } from '@runanywhere/web-llamacpp';
+import {
+  ModelCategory,
+  RunAnywhere,
+  VLMModelFamily,
+  VLMStreamEventKind,
+  vlmImageFromRawRGB,
+  type VLMGenerationOptions,
+} from '@runanywhere/web';
+import { VideoCapture } from '@runanywhere/web/browser';
 import { useModelLoader } from '../hooks/useModelLoader';
 import { ModelBanner } from './ModelBanner';
 
@@ -14,8 +21,32 @@ interface VisionResult {
   totalMs: number;
 }
 
+/** Full VLMGenerationOptions the SDK's proto ABI requires. */
+function buildVlmOptions(prompt: string, maxTokens: number): VLMGenerationOptions {
+  return {
+    prompt,
+    maxTokens,
+    temperature: 0.6,
+    topP: 0.9,
+    topK: 40,
+    stopSequences: [],
+    streamingEnabled: true,
+    systemPrompt: undefined,
+    maxImageSize: CAPTURE_DIM,
+    nThreads: 0,
+    useGpu: true,
+    modelFamily: VLMModelFamily.VLM_MODEL_FAMILY_AUTO,
+    customChatTemplate: undefined,
+    imageMarkerOverride: undefined,
+    seed: 0,
+    repetitionPenalty: 1.1,
+    minP: 0.05,
+    emitImageEmbeddings: false,
+  };
+}
+
 export function VisionTab() {
-  const loader = useModelLoader(ModelCategory.Multimodal);
+  const loader = useModelLoader(ModelCategory.MODEL_CATEGORY_MULTIMODAL);
   const [cameraActive, setCameraActive] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [liveMode, setLiveMode] = useState(false);
@@ -76,6 +107,7 @@ export function VisionTab() {
   useEffect(() => {
     return () => {
       if (liveIntervalRef.current) clearInterval(liveIntervalRef.current);
+      void RunAnywhere.visionLanguage.cancelVLMGeneration();
       const cam = captureRef.current;
       if (cam) {
         cam.stop();
@@ -110,20 +142,20 @@ export function VisionTab() {
     const t0 = performance.now();
 
     try {
-      const bridge = VLMWorkerBridge.shared;
-      if (!bridge.isModelLoaded) {
-        throw new Error('VLM model not loaded in worker');
+      const image = vlmImageFromRawRGB(frame.rgbPixels, frame.width, frame.height);
+      const options = buildVlmOptions(prompt, maxTokens);
+      const stream = await RunAnywhere.visionLanguage.processImageStream(image, options);
+
+      let text = '';
+      for await (const event of stream) {
+        if (event.kind === VLMStreamEventKind.VLM_STREAM_EVENT_KIND_TOKEN && event.token) {
+          text += event.token;
+        } else if (event.kind === VLMStreamEventKind.VLM_STREAM_EVENT_KIND_ERROR) {
+          throw new Error(event.errorMessage || 'VLM stream failed');
+        }
       }
 
-      const res = await bridge.process(
-        frame.rgbPixels,
-        frame.width,
-        frame.height,
-        prompt,
-        { maxTokens, temperature: 0.6 },
-      );
-
-      setResult({ text: res.text, totalMs: performance.now() - t0 });
+      setResult({ text, totalMs: performance.now() - t0 });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       const isWasmCrash = msg.includes('memory access out of bounds')

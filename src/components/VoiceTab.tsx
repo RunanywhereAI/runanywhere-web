@@ -1,16 +1,15 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { VoicePipeline, ModelCategory, ModelManager, AudioCapture, AudioPlayback, SpeechActivity } from '@runanywhere/web';
-import { VAD } from '@runanywhere/web-onnx';
+import { RunAnywhere, ModelCategory } from '@runanywhere/web';
+import { VoiceAgentMicDriver } from '@runanywhere/web/browser';
 import { useModelLoader } from '../hooks/useModelLoader';
 import { ModelBanner } from './ModelBanner';
 
 type VoiceState = 'idle' | 'loading-models' | 'listening' | 'processing' | 'speaking';
 
 export function VoiceTab() {
-  const llmLoader = useModelLoader(ModelCategory.Language, true);
-  const sttLoader = useModelLoader(ModelCategory.SpeechRecognition, true);
-  const ttsLoader = useModelLoader(ModelCategory.SpeechSynthesis, true);
-  const vadLoader = useModelLoader(ModelCategory.Audio, true);
+  const llmLoader = useModelLoader(ModelCategory.MODEL_CATEGORY_LANGUAGE);
+  const sttLoader = useModelLoader(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION);
+  const ttsLoader = useModelLoader(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS);
 
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const [transcript, setTranscript] = useState('');
@@ -18,25 +17,23 @@ export function VoiceTab() {
   const [audioLevel, setAudioLevel] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const micRef = useRef<AudioCapture | null>(null);
-  const pipelineRef = useRef<VoicePipeline | null>(null);
-  const vadUnsub = useRef<(() => void) | null>(null);
+  const micDriverRef = useRef<VoiceAgentMicDriver | null>(null);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      micRef.current?.stop();
-      vadUnsub.current?.();
+      micDriverRef.current?.stop();
+      void RunAnywhere.cleanupVoiceAgent();
     };
   }, []);
 
-  // Ensure all 4 models are loaded
+  // Ensure the LLM/STT/TTS trio is loaded. VAD is auto-loaded by the SDK
+  // inside RunAnywhere.initializeVoiceAgentWithLoadedModels().
   const ensureModels = useCallback(async (): Promise<boolean> => {
     setVoiceState('loading-models');
     setError(null);
 
     const results = await Promise.all([
-      vadLoader.ensure(),
       sttLoader.ensure(),
       llmLoader.ensure(),
       ttsLoader.ensure(),
@@ -50,7 +47,7 @@ export function VoiceTab() {
     setError('Failed to load one or more voice models');
     setVoiceState('idle');
     return false;
-  }, [vadLoader, sttLoader, llmLoader, ttsLoader]);
+  }, [sttLoader, llmLoader, ttsLoader]);
 
   // Start listening
   const startListening = useCallback(async () => {
@@ -58,104 +55,56 @@ export function VoiceTab() {
     setResponse('');
     setError(null);
 
-    // Load models if needed
-    const anyMissing = !ModelManager.getLoadedModel(ModelCategory.Audio)
-      || !ModelManager.getLoadedModel(ModelCategory.SpeechRecognition)
-      || !ModelManager.getLoadedModel(ModelCategory.Language)
-      || !ModelManager.getLoadedModel(ModelCategory.SpeechSynthesis);
+    const anyMissing =
+      sttLoader.state !== 'ready' || llmLoader.state !== 'ready' || ttsLoader.state !== 'ready';
 
     if (anyMissing) {
       const ok = await ensureModels();
       if (!ok) return;
     }
 
-    setVoiceState('listening');
-
-    const mic = new AudioCapture({ sampleRate: 16000 });
-    micRef.current = mic;
-
-    if (!pipelineRef.current) {
-      pipelineRef.current = new VoicePipeline();
-    }
-
-    // Start VAD + mic
-    VAD.reset();
-
-    vadUnsub.current = VAD.onSpeechActivity((activity) => {
-      if (activity === SpeechActivity.Ended) {
-        const segment = VAD.popSpeechSegment();
-        if (segment && segment.samples.length > 1600) {
-          processSpeech(segment.samples);
-        }
-      }
-    });
-
-    await mic.start(
-      (chunk) => { VAD.processSamples(chunk); },
-      (level) => { setAudioLevel(level); },
-    );
-  }, [ensureModels]);
-
-  // Process a speech segment through the full pipeline
-  const processSpeech = useCallback(async (audioData: Float32Array) => {
-    const pipeline = pipelineRef.current;
-    if (!pipeline) return;
-
-    // Stop mic during processing
-    micRef.current?.stop();
-    vadUnsub.current?.();
-    setVoiceState('processing');
-
     try {
-      const result = await pipeline.processTurn(audioData, {
-        maxTokens: 60,
-        temperature: 0.7,
-        systemPrompt: 'You are a helpful voice assistant. Keep responses concise — 1-2 sentences max.',
-      }, {
-        onTranscription: (text) => {
-          setTranscript(text);
+      // The SDK composes the currently-loaded STT/LLM/TTS models (and
+      // auto-loads the default VAD model) into a ready voice-agent session.
+      await RunAnywhere.initializeVoiceAgentWithLoadedModels();
+
+      const driver = new VoiceAgentMicDriver();
+      micDriverRef.current = driver;
+
+      setVoiceState('listening');
+
+      await driver.start({
+        onLevel: (level) => setAudioLevel(level),
+        onPhase: (phase) => {
+          setVoiceState(phase === 'processing' ? 'processing' : 'listening');
         },
-        onResponseToken: (_token, accumulated) => {
-          setResponse(accumulated);
-        },
-        onResponseComplete: (text) => {
-          setResponse(text);
-        },
-        onSynthesisComplete: async (audio, sampleRate) => {
+        onTurn: (turn) => {
+          setTranscript(turn.userText);
+          setResponse(turn.assistantText);
+          // The driver plays the synthesized reply next; reflect that in the
+          // UI until `onPhase('listening')` fires once playback completes.
           setVoiceState('speaking');
-          const player = new AudioPlayback({ sampleRate });
-          await player.play(audio, sampleRate);
-          player.dispose();
         },
-        onStateChange: (s) => {
-          if (s === 'processingSTT') setVoiceState('processing');
-          if (s === 'generatingResponse') setVoiceState('processing');
-          if (s === 'playingTTS') setVoiceState('speaking');
+        onError: (err) => {
+          setError(err.message);
         },
       });
-
-      if (result) {
-        setTranscript(result.transcription);
-        setResponse(result.response);
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+      setVoiceState('idle');
     }
-
-    setVoiceState('idle');
-    setAudioLevel(0);
-  }, []);
+  }, [ensureModels, sttLoader.state, llmLoader.state, ttsLoader.state]);
 
   const stopListening = useCallback(() => {
-    micRef.current?.stop();
-    vadUnsub.current?.();
+    micDriverRef.current?.stop();
+    micDriverRef.current = null;
+    void RunAnywhere.cleanupVoiceAgent();
     setVoiceState('idle');
     setAudioLevel(0);
   }, []);
 
   // Which loaders are still loading?
   const pendingLoaders = [
-    { label: 'VAD', loader: vadLoader },
     { label: 'STT', loader: sttLoader },
     { label: 'LLM', loader: llmLoader },
     { label: 'TTS', loader: ttsLoader },

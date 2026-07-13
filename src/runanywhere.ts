@@ -2,10 +2,10 @@
  * RunAnywhere SDK initialization and model catalog.
  *
  * This module:
- * 1. Initializes the core SDK (TypeScript-only, no WASM)
- * 2. Registers the LlamaCPP backend (loads LLM/VLM WASM)
+ * 1. Initializes the core SDK (loads the commons WASM)
+ * 2. Registers the LlamaCPP backend (loads LLM/VLM WASM — VLM runs in-process)
  * 3. Registers the ONNX backend (sherpa-onnx — STT/TTS/VAD)
- * 4. Registers the model catalog and wires up VLM worker
+ * 4. Registers the model catalog via the SDK's `RunAnywhere.registerModel*` facades
  *
  * Import this module once at app startup.
  */
@@ -13,85 +13,111 @@
 import {
   RunAnywhere,
   SDKEnvironment,
-  ModelManager,
   ModelCategory,
-  LLMFramework,
-  type CompactModelDef,
+  InferenceFramework,
+  ModelArtifactType,
+  ModelFileRole,
 } from '@runanywhere/web';
 
-import { LlamaCPP, VLMWorkerBridge } from '@runanywhere/web-llamacpp';
+import { LlamaCPP } from '@runanywhere/web-llamacpp';
 import { ONNX } from '@runanywhere/web-onnx';
 
-// Vite bundles the worker as a standalone JS chunk and returns its URL.
-// @ts-ignore — Vite-specific ?worker&url query
-import vlmWorkerUrl from './workers/vlm-worker?worker&url';
-
 // ---------------------------------------------------------------------------
-// Model catalog
+// Model catalog — registered through the SDK's `RunAnywhere.registerModel*`
+// facades (never hand-assembled proto `ModelInfo` messages; that's SDK logic).
 // ---------------------------------------------------------------------------
 
-const MODELS: CompactModelDef[] = [
+function registerCatalog(): void {
   // LLM — Liquid AI LFM2 350M (small + fast for chat)
-  {
-    id: 'lfm2-350m-q4_k_m',
-    name: 'LFM2 350M Q4_K_M',
-    repo: 'LiquidAI/LFM2-350M-GGUF',
-    files: ['LFM2-350M-Q4_K_M.gguf'],
-    framework: LLMFramework.LlamaCpp,
-    modality: ModelCategory.Language,
-    memoryRequirement: 250_000_000,
-  },
+  RunAnywhere.registerModel(
+    'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf',
+    'LFM2 350M Q4_K_M',
+    InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    {
+      id: 'lfm2-350m-q4_k_m',
+      modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+      memoryRequirement: 250_000_000,
+      downloadSizeBytes: 229_309_376,
+    },
+  );
+
   // LLM — Liquid AI LFM2 1.2B Tool (optimized for tool calling & function calling)
-  {
-    id: 'lfm2-1.2b-tool-q4_k_m',
-    name: 'LFM2 1.2B Tool Q4_K_M',
-    repo: 'LiquidAI/LFM2-1.2B-Tool-GGUF',
-    files: ['LFM2-1.2B-Tool-Q4_K_M.gguf'],
-    framework: LLMFramework.LlamaCpp,
-    modality: ModelCategory.Language,
-    memoryRequirement: 800_000_000,
-  },
-  // VLM — Liquid AI LFM2-VL 450M (vision + language)
-  {
+  RunAnywhere.registerModel(
+    'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf',
+    'LFM2 1.2B Tool Q4_K_M',
+    InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    {
+      id: 'lfm2-1.2b-tool-q4_k_m',
+      modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+      memoryRequirement: 800_000_000,
+      downloadSizeBytes: 730_894_048,
+    },
+  );
+
+  // VLM — Liquid AI LFM2-VL 450M (vision + language, primary GGUF + mmproj sidecar)
+  RunAnywhere.registerModelMultiFile({
     id: 'lfm2-vl-450m-q4_0',
     name: 'LFM2-VL 450M Q4_0',
-    repo: 'runanywhere/LFM2-VL-450M-GGUF',
-    files: ['LFM2-VL-450M-Q4_0.gguf', 'mmproj-LFM2-VL-450M-Q8_0.gguf'],
-    framework: LLMFramework.LlamaCpp,
-    modality: ModelCategory.Multimodal,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
     memoryRequirement: 500_000_000,
-  },
-  // STT (sherpa-onnx archive)
-  {
-    id: 'sherpa-onnx-whisper-tiny.en',
-    name: 'Whisper Tiny English (ONNX)',
-    url: 'https://huggingface.co/runanywhere/sherpa-onnx-whisper-tiny.en/resolve/main/sherpa-onnx-whisper-tiny.en.tar.gz',
-    framework: LLMFramework.ONNX,
-    modality: ModelCategory.SpeechRecognition,
-    memoryRequirement: 105_000_000,
-    artifactType: 'archive' as const,
-  },
-  // TTS (sherpa-onnx archive)
-  {
-    id: 'vits-piper-en_US-lessac-medium',
-    name: 'Piper TTS US English (Lessac)',
-    url: 'https://huggingface.co/runanywhere/vits-piper-en_US-lessac-medium/resolve/main/vits-piper-en_US-lessac-medium.tar.gz',
-    framework: LLMFramework.ONNX,
-    modality: ModelCategory.SpeechSynthesis,
-    memoryRequirement: 65_000_000,
-    artifactType: 'archive' as const,
-  },
-  // VAD (single ONNX file)
-  {
-    id: 'silero-vad-v5',
-    name: 'Silero VAD v5',
-    url: 'https://huggingface.co/runanywhere/silero-vad-v5/resolve/main/silero_vad.onnx',
-    files: ['silero_vad.onnx'],
-    framework: LLMFramework.ONNX,
-    modality: ModelCategory.Audio,
-    memoryRequirement: 5_000_000,
-  },
-];
+    files: [
+      {
+        url: 'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q4_0.gguf',
+        filename: 'LFM2-VL-450M-Q4_0.gguf',
+        role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
+        sizeBytes: 219_307_424,
+      },
+      {
+        url: 'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf',
+        filename: 'mmproj-LFM2-VL-450M-Q8_0.gguf',
+        role: ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR,
+        sizeBytes: 103_890_016,
+      },
+    ],
+  });
+
+  // STT — Whisper Tiny English (sherpa-onnx archive)
+  RunAnywhere.registerModelArchive(
+    'https://huggingface.co/runanywhere/sherpa-onnx-whisper-tiny.en/resolve/main/sherpa-onnx-whisper-tiny.en.tar.gz',
+    'Whisper Tiny English (ONNX)',
+    InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+    ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
+    {
+      id: 'sherpa-onnx-whisper-tiny.en',
+      modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+      memoryRequirement: 105_000_000,
+      downloadSizeBytes: 152_777_070,
+    },
+  );
+
+  // TTS — Piper US English Lessac (sherpa-onnx archive)
+  RunAnywhere.registerModelArchive(
+    'https://huggingface.co/runanywhere/vits-piper-en_US-lessac-medium/resolve/main/vits-piper-en_US-lessac-medium.tar.gz',
+    'Piper TTS US English (Lessac)',
+    InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+    ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
+    {
+      id: 'vits-piper-en_US-lessac-medium',
+      modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+      memoryRequirement: 65_000_000,
+      downloadSizeBytes: 67_389_394,
+    },
+  );
+
+  // VAD — Silero VAD v5 (single ONNX file)
+  RunAnywhere.registerModel(
+    'https://huggingface.co/runanywhere/silero-vad-v5/resolve/main/silero_vad.onnx',
+    'Silero VAD v5',
+    InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+    {
+      id: 'silero-vad-v5',
+      modality: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+      memoryRequirement: 5_000_000,
+      downloadSizeBytes: 2_327_524,
+    },
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Initialization
@@ -104,27 +130,19 @@ export async function initSDK(): Promise<void> {
   if (_initPromise) return _initPromise;
 
   _initPromise = (async () => {
-    // Step 1: Initialize core SDK (TypeScript-only, no WASM)
+    // Step 1: Initialize core SDK (loads racommons.wasm)
+    RunAnywhere.setDebugMode(true);
     await RunAnywhere.initialize({
-      environment: SDKEnvironment.Development,
-      debug: true,
+      environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
     });
 
-    // Step 2: Register backends (loads WASM automatically)
+    // Step 2: Register backends (loads their own WASM automatically). VLM
+    // is wired in-process by LlamaCPP.register() — no separate worker bridge.
     await LlamaCPP.register();
     await ONNX.register();
 
-    // Step 3: Register model catalog
-    RunAnywhere.registerModels(MODELS);
-
-    // Step 4: Wire up VLM worker
-    VLMWorkerBridge.shared.workerUrl = vlmWorkerUrl;
-    RunAnywhere.setVLMLoader({
-      get isInitialized() { return VLMWorkerBridge.shared.isInitialized; },
-      init: () => VLMWorkerBridge.shared.init(),
-      loadModel: (params) => VLMWorkerBridge.shared.loadModel(params),
-      unloadModel: () => VLMWorkerBridge.shared.unloadModel(),
-    });
+    // Step 3: Register the model catalog
+    registerCatalog();
   })();
 
   return _initPromise;
@@ -136,4 +154,4 @@ export function getAccelerationMode(): string | null {
 }
 
 // Re-export for convenience
-export { RunAnywhere, ModelManager, ModelCategory, VLMWorkerBridge };
+export { RunAnywhere, ModelCategory };
