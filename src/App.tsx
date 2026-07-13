@@ -4,8 +4,37 @@ import { ChatTab } from './components/ChatTab';
 import { VisionTab } from './components/VisionTab';
 import { VoiceTab } from './components/VoiceTab';
 import { ToolsTab } from './components/ToolsTab';
+import { TranscribeTab } from './components/TranscribeTab';
+import { SpeakTab } from './components/SpeakTab';
+import { VadTab } from './components/VadTab';
+import { DocumentsTab } from './components/DocumentsTab';
+import { EmbeddingsTab } from './components/EmbeddingsTab';
+import { StructuredOutputTab } from './components/StructuredOutputTab';
 
-type Tab = 'chat' | 'vision' | 'voice' | 'tools';
+type Tab =
+  | 'chat'
+  | 'vision'
+  | 'voice'
+  | 'tools'
+  | 'stt'
+  | 'tts'
+  | 'vad'
+  | 'docs'
+  | 'embed'
+  | 'structured';
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'chat', label: '💬 Chat' },
+  { id: 'vision', label: '📷 Vision' },
+  { id: 'voice', label: '🎙️ Voice' },
+  { id: 'tools', label: '🔧 Tools' },
+  { id: 'stt', label: '📝 Transcribe' },
+  { id: 'tts', label: '🔊 Speak' },
+  { id: 'vad', label: '📊 VAD' },
+  { id: 'docs', label: '📚 Docs' },
+  { id: 'embed', label: '🧮 Embeddings' },
+  { id: 'structured', label: '🧩 JSON' },
+];
 
 export function App() {
   const [sdkReady, setSdkReady] = useState(false);
@@ -47,18 +76,15 @@ export function App() {
       </header>
 
       <nav className="tab-bar">
-        <button className={activeTab === 'chat' ? 'active' : ''} onClick={() => setActiveTab('chat')}>
-          💬 Chat
-        </button>
-        <button className={activeTab === 'vision' ? 'active' : ''} onClick={() => setActiveTab('vision')}>
-          📷 Vision
-        </button>
-        <button className={activeTab === 'voice' ? 'active' : ''} onClick={() => setActiveTab('voice')}>
-          🎙️ Voice
-        </button>
-        <button className={activeTab === 'tools' ? 'active' : ''} onClick={() => setActiveTab('tools')}>
-          🔧 Tools
-        </button>
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            className={activeTab === tab.id ? 'active' : ''}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
       </nav>
 
       <main className="tab-content">
@@ -66,6 +92,12 @@ export function App() {
         {activeTab === 'vision' && <VisionTab />}
         {activeTab === 'voice' && <VoiceTab />}
         {activeTab === 'tools' && <ToolsTab />}
+        {activeTab === 'stt' && <TranscribeTab />}
+        {activeTab === 'tts' && <SpeakTab />}
+        {activeTab === 'vad' && <VadTab />}
+        {activeTab === 'docs' && <DocumentsTab />}
+        {activeTab === 'embed' && <EmbeddingsTab />}
+        {activeTab === 'structured' && <StructuredOutputTab />}
       </main>
     </div>
   );

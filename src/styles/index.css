@@ -71,18 +71,25 @@ body {
 .tab-bar {
   display: flex;
   border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
 }
 
+.tab-bar::-webkit-scrollbar { height: 3px; }
+.tab-bar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
 .tab-bar button {
-  flex: 1;
-  padding: 10px;
+  flex: 0 0 auto;
+  padding: 10px 14px;
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
+  white-space: nowrap;
   transition: all 0.2s;
 }
 
@@ -700,3 +707,141 @@ body {
 }
 
 .text-muted { color: var(--text-muted); font-size: 13px; }
+
+/* ---------------------------------------------------------------------------
+ * Shared tab primitives (Transcribe / Speak / VAD / Docs / Embeddings / JSON)
+ * --------------------------------------------------------------------------- */
+
+.scroll-panel {
+  padding: 16px;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+}
+
+.section h3 {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.section code {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  background: var(--bg);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--text);
+}
+
+.section input[type="file"] { font-size: 12px; color: var(--text-muted); }
+
+.btn-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.field-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.text-area {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  resize: vertical;
+}
+
+.text-area:focus { border-color: var(--primary); }
+.text-area.mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; }
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.slider-row input[type="range"] { flex: 1; accent-color: var(--primary); }
+
+.status-line { margin-top: 2px; font-size: 12px; }
+
+.output-pre {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--bg);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pill-green { background: var(--green); color: white; }
+.pill-grey { background: var(--bg-input); color: var(--text-muted); }
+
+.stat-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.similarity-value {
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--primary);
+  text-align: center;
+  padding: 8px 0;
+}
+
+.rag-answer {
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.rag-source {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.rag-source strong { color: var(--text); font-size: 12px; }

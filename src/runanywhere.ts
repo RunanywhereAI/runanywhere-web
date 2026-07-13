@@ -54,19 +54,20 @@ function registerCatalog(): void {
     },
   );
 
-  // VLM — Liquid AI LFM2-VL 450M (vision + language, primary GGUF + mmproj sidecar)
+  // VLM — Liquid AI LFM2-VL 450M (vision + language, primary GGUF + mmproj
+  // sidecar). Mirrors the reference example's known-good Q8_0 entry.
   RunAnywhere.registerModelMultiFile({
-    id: 'lfm2-vl-450m-q4_0',
-    name: 'LFM2-VL 450M Q4_0',
+    id: 'lfm2-vl-450m-q8_0',
+    name: 'LFM2-VL 450M Q8_0',
     framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
     modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-    memoryRequirement: 500_000_000,
+    memoryRequirement: 650_000_000,
     files: [
       {
-        url: 'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q4_0.gguf',
-        filename: 'LFM2-VL-450M-Q4_0.gguf',
+        url: 'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf',
+        filename: 'LFM2-VL-450M-Q8_0.gguf',
         role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
-        sizeBytes: 219_307_424,
+        sizeBytes: 379_215_264,
       },
       {
         url: 'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf',
@@ -105,18 +106,44 @@ function registerCatalog(): void {
     },
   );
 
-  // VAD — Silero VAD v5 (single ONNX file)
+  // VAD — Silero VAD v5 (single ONNX file). The id MUST be `silero-vad` to
+  // match the SDK's `RunAnywhere.defaultVADModelID`, which the voice agent
+  // uses to auto-load VAD in `initializeVoiceAgentWithLoadedModels()`.
   RunAnywhere.registerModel(
     'https://huggingface.co/runanywhere/silero-vad-v5/resolve/main/silero_vad.onnx',
-    'Silero VAD v5',
+    'Silero VAD',
     InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
     {
-      id: 'silero-vad-v5',
+      id: 'silero-vad',
       modality: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
       memoryRequirement: 5_000_000,
       downloadSizeBytes: 2_327_524,
     },
   );
+
+  // Embeddings — All MiniLM L6 v2 (ONNX model.onnx + vocab.txt sidecar). Used
+  // by the Embeddings demo and as the RAG pipeline's embedding model.
+  RunAnywhere.registerModelMultiFile({
+    id: 'all-minilm-l6-v2',
+    name: 'All MiniLM L6 v2',
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+    modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+    memoryRequirement: 120_000_000,
+    files: [
+      {
+        url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx',
+        filename: 'model.onnx',
+        role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
+        sizeBytes: 90_387_606,
+      },
+      {
+        url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt',
+        filename: 'vocab.txt',
+        role: ModelFileRole.MODEL_FILE_ROLE_VOCABULARY,
+        sizeBytes: 231_508,
+      },
+    ],
+  });
 }
 
 // ---------------------------------------------------------------------------
