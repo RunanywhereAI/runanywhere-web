@@ -19,10 +19,10 @@
     "node": ">=22.12.0"
   },
   "dependencies": {
-    "@runanywhere/proto-ts": "^0.20.15",
-    "@runanywhere/web": "^0.20.15",
-    "@runanywhere/web-llamacpp": "^0.20.15",
-    "@runanywhere/web-onnx": "^0.20.15"
+    "@runanywhere/proto-ts": "^0.20.16",
+    "@runanywhere/web": "^0.20.16",
+    "@runanywhere/web-llamacpp": "^0.20.16",
+    "@runanywhere/web-onnx": "^0.20.16"
   },
   "devDependencies": {
     "@bufbuild/protobuf": "^2.12.1",
