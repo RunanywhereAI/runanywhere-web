@@ -1,0 +1,66 @@
+name: CI
+
+# What this gate proves: a clean clone of THIS repo — with no monorepo checkout,
+# no source aliases and no locally built WASM — installs the RunAnywhere Web SDK
+# from the npm registry and type-checks, lints, tests and builds the demo app.
+#
+# CURRENTLY EXPECTED TO FAIL — waiting on unpublished packages. None of the four
+# SDK dependencies in package.json exist on npm yet at 0.20.15:
+#   @runanywhere/web, @runanywhere/web-llamacpp, @runanywhere/web-onnx,
+#   @runanywhere/proto-ts
+# so the install step dies with E404 and everything after it is skipped. This job
+# is deliberately blocking and red rather than faked green with
+# continue-on-error: the red IS the accurate status. It turns green on its own
+# the moment those four packages publish — nothing in this file needs editing.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, lint, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      # `npm ci` is the intended end state, but it cannot run today: the
+      # committed package-lock.json predates the npm publish of the SDK and
+      # contains zero @runanywhere/* entries (its root "dependencies" block is
+      # empty), so `npm ci` refuses with "package.json and package-lock.json are
+      # not in sync". The lock cannot be regenerated until the packages exist on
+      # the registry, so this uses `npm install`, which resolves the same
+      # registry versions and writes a lock as a side effect.
+      #
+      # TO RETIRE THIS: once @runanywhere/{web,web-llamacpp,web-onnx,proto-ts}@0.20.15
+      # are on npm, run `npm install` locally, commit the refreshed
+      # package-lock.json, and switch the line below back to `npm ci`
+      # (vercel.json already uses `npm ci` for deploys, so the lock must be
+      # correct there anyway).
+      - name: Install dependencies (SDK from npm)
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Build
+        run: npm run build
