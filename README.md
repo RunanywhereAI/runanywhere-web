@@ -49,9 +49,11 @@ and every WASM artifact come out of `node_modules/@runanywhere/*`.
 | `@runanywhere/web-onnx` | Sherpa-ONNX backend registration — STT, TTS, VAD |
 | `@runanywhere/proto-ts` | Generated protobuf types (models, events, errors, modalities) |
 
-> **Known-red build:** none of the four packages are published to npm at `0.20.15`
-> yet, so `npm install` currently fails with `E404`. Everything in this repo is
-> correct for the moment they publish; there is no local fallback by design.
+> **Known-red build:** all four packages are on npm, but the newest published
+> version is **0.20.10** — `0.20.15` is still in flight. `npm install` therefore
+> fails with `npm error code ETARGET` / `No matching version found for
+> @runanywhere/proto-ts@^0.20.15`. Everything in this repo is correct for the
+> moment 0.20.15 publishes; there is no local fallback by design.
 
 To test an unreleased SDK build, `npm install` a packed tarball or `npm link` —
 never re-introduce a source alias.
@@ -122,7 +124,7 @@ SDK routing, storage, or inference rules in UI code. See `AGENTS.md`.
 
 | Symptom | Fix |
 |---|---|
-| `npm error 404 @runanywhere/web` | The SDK packages are not on npm yet (see above) |
+| `npm error code ETARGET … @runanywhere/*@^0.20.15` | SDK 0.20.15 is not on npm yet; 0.20.10 is the newest published (see above) |
 | `SharedArrayBuffer is not defined` | The page is not cross-origin isolated — serve with COOP `same-origin` + COEP `credentialless` (dev server and `vercel.json` do this) |
 | Model download stalls or workers hang | Hard-reload to clear a stale service worker, then re-check the COOP/COEP headers |
 | WebGPU model produces garbage | Switch that model to the CPU WASM variant in Settings |

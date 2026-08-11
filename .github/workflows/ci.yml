@@ -4,14 +4,18 @@ name: CI
 # no source aliases and no locally built WASM — installs the RunAnywhere Web SDK
 # from the npm registry and type-checks, lints, tests and builds the demo app.
 #
-# CURRENTLY EXPECTED TO FAIL — waiting on unpublished packages. None of the four
-# SDK dependencies in package.json exist on npm yet at 0.20.15:
+# CURRENTLY EXPECTED TO FAIL — waiting on an unpublished SDK version. All four
+# SDK dependencies exist on npm but top out at 0.20.10, while package.json asks
+# for ^0.20.15:
 #   @runanywhere/web, @runanywhere/web-llamacpp, @runanywhere/web-onnx,
 #   @runanywhere/proto-ts
-# so the install step dies with E404 and everything after it is skipped. This job
-# is deliberately blocking and red rather than faked green with
-# continue-on-error: the red IS the accurate status. It turns green on its own
-# the moment those four packages publish — nothing in this file needs editing.
+# so the install step dies with
+#   npm error code ETARGET
+#   npm error notarget No matching version found for @runanywhere/proto-ts@^0.20.15
+# and everything after it is skipped. This job is deliberately blocking and red
+# rather than faked green with continue-on-error: the red IS the accurate status.
+# It turns green on its own the moment 0.20.15 publishes — nothing in this file
+# needs editing.
 
 on:
   push:
