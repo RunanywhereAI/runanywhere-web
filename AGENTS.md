@@ -63,8 +63,10 @@ keep each view focused on DOM state and user-flow orchestration.
 
 Brand primary is `#FF6900` (the logo orange), with the brand gradient
 `linear-gradient(135deg, #FF6900, #FB2C36)`. The canonical palette, typography,
-and contrast rules live in `../../DESIGN_GUIDELINE.md`; this app hand-maintains
-its mirror of those values as CSS custom properties in
+and contrast rules live in the SDK monorepo's `examples/DESIGN_GUIDELINE.md`
+([runanywhere-sdks](https://github.com/RunanywhereAI/runanywhere-sdks)), which is
+not vendored here; this app hand-maintains its mirror of those values as CSS
+custom properties in
 `src/styles/design-system.css` (the single token layer — `commons.css` and
 `components.css` consume the variables). Light/dark theming works via
 `:root[data-theme="light"|"dark"]` for the explicit toggle plus
@@ -74,7 +76,7 @@ views — use the tokens.
 
 ## Commands
 
-Run from `examples/web/RunAnywhereAI/`.
+Run from the repository root.
 
 Vite 8 requires Node `20.19+` or `22.12+`; the example mirrors that constraint
 in its `engines` field. Production output is pinned to Chrome 86 syntax
@@ -83,7 +85,7 @@ the Web SDK's documented browser floor. This build target does not polyfill
 missing browser APIs; WebGPU remains optional and falls back to the CPU backend.
 
 ```bash
-npm install   # pulls the @runanywhere/* SDK packages (JS + WASM) from npm
+npm ci        # pulls the @runanywhere/* SDK packages (JS + WASM) from npm
 npm run lint
 npm run typecheck
 npm run build
@@ -98,10 +100,10 @@ isolated static Vercel prebuilt output, rejects unexpected functions, and
 deploys that exact output. After deployment, verify COOP/COEP headers,
 `crossOriginIsolated`, SPA routing, and all four canonical JS/WASM pairs.
 
-Keep `scripts/` limited to its two distinct workflows: `release.sh` owns static
-release verification/staging/deployment, and `sync-solutions.mjs` owns generated
-solution configuration. Extend one of those tools or use an npm command rather
-than adding another single-use wrapper.
+`scripts/` holds exactly one tool: `release.sh`, which owns static release
+verification/staging/deployment. Extend it or use an npm command rather than
+adding another single-use wrapper. Note that `src/services/solutions-config.ts`
+is vendored, not generated here — see the header comment in that file.
 
 ## SDK Surfaces By View
 

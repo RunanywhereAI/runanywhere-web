@@ -4,18 +4,10 @@ name: CI
 # no source aliases and no locally built WASM — installs the RunAnywhere Web SDK
 # from the npm registry and type-checks, lints, tests and builds the demo app.
 #
-# CURRENTLY EXPECTED TO FAIL — waiting on an unpublished SDK version. All four
-# SDK dependencies exist on npm but top out at 0.20.10, while package.json asks
-# for ^0.20.15:
-#   @runanywhere/web, @runanywhere/web-llamacpp, @runanywhere/web-onnx,
-#   @runanywhere/proto-ts
-# so the install step dies with
-#   npm error code ETARGET
-#   npm error notarget No matching version found for @runanywhere/proto-ts@^0.20.15
-# and everything after it is skipped. This job is deliberately blocking and red
-# rather than faked green with continue-on-error: the red IS the accurate status.
-# It turns green on its own the moment 0.20.15 publishes — nothing in this file
-# needs editing.
+# All four SDK dependencies (@runanywhere/web, @runanywhere/web-llamacpp,
+# @runanywhere/web-onnx, @runanywhere/proto-ts) are published on npm, so this
+# job is expected to be GREEN. A red run is a real regression — do not paper
+# over it with continue-on-error.
 
 on:
   push:
@@ -41,21 +33,12 @@ jobs:
           node-version: 24
           cache: npm
 
-      # `npm ci` is the intended end state, but it cannot run today: the
-      # committed package-lock.json predates the npm publish of the SDK and
-      # contains zero @runanywhere/* entries (its root "dependencies" block is
-      # empty), so `npm ci` refuses with "package.json and package-lock.json are
-      # not in sync". The lock cannot be regenerated until the packages exist on
-      # the registry, so this uses `npm install`, which resolves the same
-      # registry versions and writes a lock as a side effect.
-      #
-      # TO RETIRE THIS: once @runanywhere/{web,web-llamacpp,web-onnx,proto-ts}@0.20.15
-      # are on npm, run `npm install` locally, commit the refreshed
-      # package-lock.json, and switch the line below back to `npm ci`
-      # (vercel.json already uses `npm ci` for deploys, so the lock must be
-      # correct there anyway).
+      # Must stay `npm ci`, not `npm install`: vercel.json installs with
+      # `npm ci`, so CI has to exercise the exact same path. `npm install`
+      # silently repairs a stale package-lock.json, which would let a lock that
+      # breaks every Vercel deploy sail through this gate.
       - name: Install dependencies (SDK from npm)
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Typecheck
         run: npm run typecheck

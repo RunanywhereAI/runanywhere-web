@@ -4,10 +4,10 @@
  * A "solution" is a prepackaged pipeline: one YAML file names a set of models
  * and the C++ core compiles it into a GraphScheduler DAG. This view runs the
  * two canonical solutions shipped at
- * `sdk/runanywhere-commons/examples/solutions/`, synced into a generated module
- * by `scripts/sync-solutions.mjs` (iOS parity:
- * `examples/ios/RunAnywhereAI/scripts/sync-solutions-yamls.sh`) so the view
- * never embeds a drift-prone inline copy.
+ * `sdk/runanywhere-commons/examples/solutions/` in the SDK monorepo, vendored
+ * here as `services/solutions-config.ts` so the view never embeds a
+ * drift-prone inline copy. That module is generated upstream, not in this
+ * repo — see its header for how to refresh it.
  *
  * WHAT A RUN HERE ACTUALLY PROVES — and why the copy is worded so carefully.
  * The exported C ABI has no output channel and no non-destructive join:

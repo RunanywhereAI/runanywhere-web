@@ -35,10 +35,10 @@ and every WASM artifact come out of `node_modules/@runanywhere/*`.
 ```jsonc
 // package.json — the actual, current declarations
 "dependencies": {
-  "@runanywhere/proto-ts":     "^0.20.15",
-  "@runanywhere/web":          "^0.20.15",
-  "@runanywhere/web-llamacpp": "^0.20.15",
-  "@runanywhere/web-onnx":     "^0.20.15"
+  "@runanywhere/proto-ts":     "^0.20.17",
+  "@runanywhere/web":          "^0.20.17",
+  "@runanywhere/web-llamacpp": "^0.20.17",
+  "@runanywhere/web-onnx":     "^0.20.17"
 }
 ```
 
@@ -49,11 +49,8 @@ and every WASM artifact come out of `node_modules/@runanywhere/*`.
 | `@runanywhere/web-onnx` | Sherpa-ONNX backend registration — STT, TTS, VAD |
 | `@runanywhere/proto-ts` | Generated protobuf types (models, events, errors, modalities) |
 
-> **Known-red build:** all four packages are on npm, but the newest published
-> version is **0.20.10** — `0.20.15` is still in flight. `npm install` therefore
-> fails with `npm error code ETARGET` / `No matching version found for
-> @runanywhere/proto-ts@^0.20.15`. Everything in this repo is correct for the
-> moment 0.20.15 publishes; there is no local fallback by design.
+All four packages are published on npm at 0.20.17, so a clean clone installs and
+builds with no extra setup. There is no local fallback by design.
 
 To test an unreleased SDK build, `npm install` a packed tarball or `npm link` —
 never re-introduce a source alias.
@@ -66,7 +63,7 @@ never re-introduce a source alias.
 git clone https://github.com/RunanywhereAI/runanywhere-web.git
 cd runanywhere-web
 
-npm install      # pulls the SDK + its WASM artifacts from npm
+npm ci           # pulls the SDK + its WASM artifacts from npm (lockfile-exact)
 npm run dev      # http://localhost:3000
 ```
 
@@ -84,14 +81,13 @@ npm run dev      # http://localhost:3000
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every push to `main` and every pull request:
-`ubuntu-latest` + Node 24 → install → `typecheck` → `lint` → `test` → `build`.
+`ubuntu-latest` + Node 24 → `npm ci` → `typecheck` → `lint` → `test` → `build`.
 
-It installs with `npm install` rather than `npm ci`, because the committed
-`package-lock.json` predates the SDK's npm publish and contains no
-`@runanywhere/*` entries — `npm ci` would reject it as out of sync, and it cannot
-be regenerated until the packages exist. Once they publish, regenerate and commit
-the lock and switch CI back to `npm ci` (which is also what `vercel.json` uses for
-deploys). The workflow comment says the same.
+CI installs with `npm ci` — the same command `vercel.json` uses for deploys — so
+a `package-lock.json` that is out of sync with `package.json` fails the gate
+instead of breaking production. If you change any dependency, commit the
+regenerated lock alongside it; `npm install` would quietly repair the lock
+locally and hide the breakage from CI.
 
 ---
 
@@ -124,7 +120,7 @@ SDK routing, storage, or inference rules in UI code. See `AGENTS.md`.
 
 | Symptom | Fix |
 |---|---|
-| `npm error code ETARGET … @runanywhere/*@^0.20.15` | SDK 0.20.15 is not on npm yet; 0.20.10 is the newest published (see above) |
+| `npm ci` fails with `Missing: @runanywhere/… from lock file` | `package.json` and `package-lock.json` drifted — run `npm install` and commit the refreshed lock |
 | `SharedArrayBuffer is not defined` | The page is not cross-origin isolated — serve with COOP `same-origin` + COEP `credentialless` (dev server and `vercel.json` do this) |
 | Model download stalls or workers hang | Hard-reload to clear a stale service worker, then re-check the COOP/COEP headers |
 | WebGPU model produces garbage | Switch that model to the CPU WASM variant in Settings |
