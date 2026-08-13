@@ -35,10 +35,10 @@ and every WASM artifact come out of `node_modules/@runanywhere/*`.
 ```jsonc
 // package.json — the actual, current declarations
 "dependencies": {
-  "@runanywhere/proto-ts":     "^0.20.17",
-  "@runanywhere/web":          "^0.20.17",
-  "@runanywhere/web-llamacpp": "^0.20.17",
-  "@runanywhere/web-onnx":     "^0.20.17"
+  "@runanywhere/proto-ts":     "^0.20.18",
+  "@runanywhere/web":          "^0.20.18",
+  "@runanywhere/web-llamacpp": "^0.20.18",
+  "@runanywhere/web-onnx":     "^0.20.18"
 }
 ```
 
@@ -49,7 +49,7 @@ and every WASM artifact come out of `node_modules/@runanywhere/*`.
 | `@runanywhere/web-onnx` | Sherpa-ONNX backend registration — STT, TTS, VAD |
 | `@runanywhere/proto-ts` | Generated protobuf types (models, events, errors, modalities) |
 
-All four packages are published on npm at 0.20.17, so a clean clone installs and
+All four packages are published on npm at 0.20.18, so a clean clone installs and
 builds with no extra setup. There is no local fallback by design.
 
 To test an unreleased SDK build, `npm install` a packed tarball or `npm link` —
