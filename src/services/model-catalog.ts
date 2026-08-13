@@ -426,6 +426,48 @@ const CATALOG: readonly CatalogEntry[] = [
       },
     ],
   },
+  {
+    // LiquidAI's LFM2.5-VL 3B — the vision-language sibling of the LFM2.5 text
+    // rows above, and the largest VLM Liquid publishes as GGUF. Listed for
+    // cross-platform discovery and gated exactly like
+    // `nemotron-mini-4b-instruct-q4_k_m` above: the smallest publishable pair
+    // upstream ships (Q4_K_M primary 1.674 GB + Q8_0 mmproj 0.583 GB =
+    // 2.258 GB) is staged in MEMFS and then loaded again with use_mmap=false,
+    // so the simultaneous footprint clears 4.5 GB and cannot fit the WASM32
+    // 4 GiB address space. `webModelCompatibility` therefore returns
+    // supported:false and the picker disables download and load. Dropping to
+    // the Q4_0 primary (1.594 GB) does not change that verdict, so there is no
+    // smaller quantization worth listing instead. The upstream
+    // LFM2.5-VL-3B-MLX-4bit sibling is deliberately absent: MLX is
+    // Apple-silicon-native and has no browser runtime at all. Immutable Hub
+    // revision plus exact LFS byte counts keep the memory gate deterministic.
+    id: 'lfm2.5-vl-3b-q4_k_m',
+    name: 'LiquidAI LFM2.5-VL 3B Q4_K_M',
+    description:
+      'LiquidAI LFM2.5-VL vision-language model (primary GGUF + mmproj sidecar). Listed for reference — its memory footprint exceeds the browser WASM32 4 GiB limit, so it cannot load in-browser (use a native app).',
+    category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/LiquidAI/LFM2.5-VL-3B-GGUF/resolve/3e0e828198e2abb75a957ad823f5d691c13f0f28/LFM2.5-VL-3B-Q4_K_M.gguf',
+    downloadSizeBytes: 2_257_563_360,
+    memoryRequiredBytes: 2_800_000_000,
+    contextLength: 4096,
+    files: [
+      {
+        url: 'https://huggingface.co/LiquidAI/LFM2.5-VL-3B-GGUF/resolve/3e0e828198e2abb75a957ad823f5d691c13f0f28/LFM2.5-VL-3B-Q4_K_M.gguf',
+        filename: 'LFM2.5-VL-3B-Q4_K_M.gguf',
+        role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
+        sizeBytes: 1_674_454_240,
+      },
+      {
+        url: 'https://huggingface.co/LiquidAI/LFM2.5-VL-3B-GGUF/resolve/3e0e828198e2abb75a957ad823f5d691c13f0f28/mmproj-LFM2.5-VL-3B-Q8_0.gguf',
+        filename: 'mmproj-LFM2.5-VL-3B-Q8_0.gguf',
+        role: ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR,
+        sizeBytes: 583_109_120,
+      },
+    ],
+  },
 
   // ---------- STT (Sherpa-ONNX) ----------
 

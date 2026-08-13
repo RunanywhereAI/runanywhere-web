@@ -48,6 +48,37 @@ describe('Web catalog integrity', () => {
     expect(model && webModelCompatibility(model)).toEqual({ supported: true });
   });
 
+  it('catalogs but gates LFM2.5-VL 3B, whose staged+loaded pair overruns WASM32', () => {
+    // The primary GGUF and its mmproj sidecar are staged in MEMFS and then
+    // loaded again (use_mmap=false), so 2.258 GB of artifact needs well over
+    // 4 GiB simultaneously. The row exists for cross-platform discovery; the
+    // gate is what stops a download that could never load.
+    const model = getCatalog().find(({ id }) => id === 'lfm2.5-vl-3b-q4_k_m');
+
+    expect(model).toMatchObject({
+      name: 'LiquidAI LFM2.5-VL 3B Q4_K_M',
+      category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      format: ModelFormat.MODEL_FORMAT_GGUF,
+      downloadSizeBytes: 2_257_563_360,
+    });
+    expect(model?.files?.map(({ filename, sizeBytes }) => [filename, sizeBytes])).toEqual([
+      ['LFM2.5-VL-3B-Q4_K_M.gguf', 1_674_454_240],
+      ['mmproj-LFM2.5-VL-3B-Q8_0.gguf', 583_109_120],
+    ]);
+    expect(model && webModelCompatibility(model)).toMatchObject({
+      supported: false,
+      code: WebModelCompatibilityCode.WASM32_ADDRESS_SPACE,
+    });
+
+    // No smaller published quantization rescues it either: the Q4_0 primary
+    // (1.594 GB) paired with the same mmproj is still gated.
+    expect(webSizeCompatibility(1_593_894_112 + 583_109_120, 2_200_000_000)).toMatchObject({
+      supported: false,
+      code: WebModelCompatibilityCode.WASM32_ADDRESS_SPACE,
+    });
+  });
+
   it('keeps the four PrismML Bonsai 1-bit rows with vendor-and-quant names', () => {
     const bonsai = getCatalog().filter(({ id }) => id.startsWith('bonsai-'));
 
