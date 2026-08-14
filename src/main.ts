@@ -91,12 +91,13 @@ let identityReadinessState: IdentityReadinessState = 'not-required';
 let identityInitializationError: string | undefined;
 let appReadinessState: AppReadinessState = 'booting';
 let readinessStep: AppReadinessStep = 'booting';
+let activeAccelerationMode: 'cpu' | 'webgpu' = 'cpu';
 
 interface RuntimeConfiguration {
   environment: Environment;
   apiKey?: string;
-  /** Spelled to match `SDKInitOptions.baseURL`; this object is passed to `initialize()` as-is. */
-  baseURL?: string;
+  /** Spelled to match the public `RunAnywhere.initialize()` option. */
+  baseUrl?: string;
 }
 
 let activeRuntimeConfiguration: RuntimeConfiguration | null = null;
@@ -331,17 +332,43 @@ async function waitForInteractiveShell(): Promise<AppReadinessSnapshot> {
 // Cross-Origin Isolation (enables SharedArrayBuffer on Safari/iOS)
 // ---------------------------------------------------------------------------
 
+const COI_SERVICE_WORKER_PATH = '/coi-serviceworker.js';
+const COI_MIGRATION_RELOAD_KEY = 'runanywhere.coi-migration-reload';
+
+async function waitForServiceWorkerActivation(worker: ServiceWorker): Promise<void> {
+  if (worker.state === 'activated') return;
+
+  await new Promise<void>((resolve) => {
+    worker.addEventListener('statechange', () => {
+      if (worker.state === 'activated') resolve();
+    });
+  });
+}
+
+async function reloadAfterIsolationMigration(message: string): Promise<never> {
+  if (sessionStorage.getItem(COI_MIGRATION_RELOAD_KEY) === 'done') {
+    throw new Error(
+      'Cross-origin isolation did not recover after refreshing its browser worker. Clear this site\'s data and reload.',
+    );
+  }
+
+  sessionStorage.setItem(COI_MIGRATION_RELOAD_KEY, 'done');
+  appLogger.info(message);
+  window.location.reload();
+  return await new Promise<never>(() => {});
+}
+
 /**
- * Registers a service worker that injects COOP/COEP headers for browsers
- * that don't support `credentialless` COEP (Safari/WebKit).
+ * Registers a service worker that injects COOP/COEP headers for static hosts
+ * that cannot provide the required response headers themselves.
  *
- * - On Chrome/Firefox: `crossOriginIsolated` is already true via Vite or the
- *   static host's response headers, so this is a no-op.
- * - On Safari/iOS: `crossOriginIsolated` is false, so the SW installs
- *   and the page reloads once to activate it.
+ * - On the Vite and Vercel release paths, `crossOriginIsolated` is already true
+ *   via COOP + `require-corp`, so this is a no-op in every supported browser.
+ * - On a headerless static host, the SW installs and reloads once to activate.
  */
 async function ensureCrossOriginIsolation(): Promise<void> {
   if (crossOriginIsolated) {
+    sessionStorage.removeItem(COI_MIGRATION_RELOAD_KEY);
     appLogger.info('[COI] Already cross-origin isolated');
     return;
   }
@@ -351,31 +378,32 @@ async function ensureCrossOriginIsolation(): Promise<void> {
     return;
   }
 
-  const registration = await navigator.serviceWorker.register('/coi-serviceworker.js');
+  const registration = await navigator.serviceWorker.register(COI_SERVICE_WORKER_PATH);
 
-  // If the SW is already active and controlling this page, COI should be
-  // enabled. If we're still not isolated, something else is wrong.
+  // A returning Safari profile can still be controlled by the previous
+  // service-worker revision while the new one installs. Do not continue into
+  // pthread WASM under that stale controller: wait for the replacement and
+  // reload so the next document receives its require-corp navigation headers.
   if (navigator.serviceWorker.controller) {
-    appLogger.warning('[COI] Service worker active but page is not cross-origin isolated');
-    return;
+    await registration.update();
+    const replacement = registration.installing || registration.waiting;
+    if (replacement) await waitForServiceWorkerActivation(replacement);
+    await reloadAfterIsolationMigration(
+      '[COI] Refreshed isolation service worker — reloading before WASM startup',
+    );
   }
 
   // Wait for the newly installed SW to activate, then reload so its
   // fetch handler can inject the required headers.
   const sw = registration.installing || registration.waiting;
   if (sw) {
-    await new Promise<void>((resolve) => {
-      sw.addEventListener('statechange', () => {
-        if (sw.state === 'activated') resolve();
-      });
-      // If it's already activated by the time we check
-      if (sw.state === 'activated') resolve();
-    });
-    appLogger.info('[COI] Service worker activated — reloading for cross-origin isolation');
-    window.location.reload();
-    // Halt execution — the reload will re-enter main()
-    await new Promise(() => {});
+    await waitForServiceWorkerActivation(sw);
+    await reloadAfterIsolationMigration(
+      '[COI] Service worker activated — reloading for cross-origin isolation',
+    );
   }
+
+  throw new Error('Cross-origin isolation service worker did not activate.');
 }
 
 // ---------------------------------------------------------------------------
@@ -407,6 +435,7 @@ async function main(): Promise<void> {
     publishReadinessStep('building-shell');
     publishReadiness('building-shell');
     buildAppShell();
+    showAccelerationBadge(activeAccelerationMode);
     await waitForInteractiveShell();
   } catch (error) {
     // Show error view with retry
@@ -440,12 +469,11 @@ async function initializeSDK(): Promise<void> {
     const configuration: RuntimeConfiguration = hostedConfiguration
       ? {
           apiKey: hostedConfiguration.apiKey,
-          // Mapped field-by-field rather than spread, because the spread's
-          // excess properties are invisible to the type checker: the name has
-          // to match `SDKInitOptions.baseURL` exactly or the URL is dropped at
-          // runtime while both sides still compile, and production init fails
-          // with "URL required".
-          baseURL: hostedConfiguration.baseURL,
+          // Settings keeps the conventional `baseURL` spelling; the public SDK
+          // initializer deliberately exposes `baseUrl`. Map that boundary
+          // explicitly so production credentials never reach native init with
+          // an empty control-plane URL.
+          baseUrl: hostedConfiguration.baseURL,
           environment: 'production',
         }
       : { environment: 'development' };
@@ -601,6 +629,7 @@ async function startRuntime(
     '| storage backend:', RunAnywhere.storage.backend,
   );
 
+  activeAccelerationMode = activeAcceleration;
   showAccelerationBadge(activeAcceleration);
 }
 
@@ -617,7 +646,7 @@ function applyAPIConfiguration(
   runtimeReconfigurationPromise = (async () => {
     const next: RuntimeConfiguration = {
       apiKey: configuration.apiKey,
-      baseURL: configuration.baseURL,
+      baseUrl: configuration.baseURL,
       environment: 'production',
     };
     const previous = activeRuntimeConfiguration;

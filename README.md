@@ -121,7 +121,7 @@ SDK routing, storage, or inference rules in UI code. See `AGENTS.md`.
 | Symptom | Fix |
 |---|---|
 | `npm ci` fails with `Missing: @runanywhere/… from lock file` | `package.json` and `package-lock.json` drifted — run `npm install` and commit the refreshed lock |
-| `SharedArrayBuffer is not defined` | The page is not cross-origin isolated — serve with COOP `same-origin` + COEP `credentialless` (dev server and `vercel.json` do this) |
+| `SharedArrayBuffer is not defined` | The page is not cross-origin isolated — serve with COOP `same-origin` + COEP `require-corp` (the dev server and `vercel.json` do this) |
 | Model download stalls or workers hang | Hard-reload to clear a stale service worker, then re-check the COOP/COEP headers |
 | WebGPU model produces garbage | Switch that model to the CPU WASM variant in Settings |
 

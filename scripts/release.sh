@@ -97,6 +97,11 @@ deploy_prebuilt() {
 
   npm run release:build
   stage_prebuilt
+  # Recent Vercel CLI versions require the environment-specific project
+  # settings inside the isolated staging directory before `vercel build` can
+  # consume a prebuilt app. Pull them only into the ignored/disposable stage;
+  # the source checkout remains credential-free.
+  vercel pull --yes --environment production --cwd .vercel-stage "$@"
   vercel build --prod --cwd .vercel-stage
   verify_output .vercel-stage/.vercel/output/static
 

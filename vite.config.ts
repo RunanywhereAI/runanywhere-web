@@ -91,7 +91,7 @@ function copyWasmPlugin(requireCompleteArtifacts: boolean): Plugin {
 
 const isolationHeaders = {
   'Cross-Origin-Opener-Policy': 'same-origin',
-  'Cross-Origin-Embedder-Policy': 'credentialless',
+  'Cross-Origin-Embedder-Policy': 'require-corp',
 } as const;
 
 export default defineConfig(({ command }) => {

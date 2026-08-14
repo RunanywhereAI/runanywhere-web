@@ -1,8 +1,8 @@
 /**
  * Cross-Origin Isolation Service Worker
  *
- * Enables SharedArrayBuffer on browsers that don't support COEP: credentialless
- * (Safari/WebKit). This is required for multi-threaded WASM (pthreads).
+ * Enables SharedArrayBuffer when the static host cannot provide COOP/COEP
+ * response headers. This is required for multi-threaded WASM (pthreads).
  *
  * How it works:
  * - Intercepts navigation responses and injects COOP + COEP headers
@@ -28,6 +28,17 @@ self.addEventListener('fetch', (event) => {
     // Navigation requests (HTML pages): inject COOP + COEP headers
     event.respondWith(
       fetch(request).then((response) => {
+        // A production host may already provide the exact isolation contract.
+        // Preserve that response byte-for-byte instead of rebuilding its body:
+        // WebKit can otherwise retain a legacy controlled navigation as an
+        // empty page when the host migrates from credentialless to require-corp.
+        if (
+          response.headers.get('Cross-Origin-Opener-Policy') === 'same-origin'
+          && response.headers.get('Cross-Origin-Embedder-Policy') === 'require-corp'
+        ) {
+          return response;
+        }
+
         const headers = new Headers(response.headers);
         headers.set('Cross-Origin-Opener-Policy', 'same-origin');
         headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
