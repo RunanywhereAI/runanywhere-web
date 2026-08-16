@@ -1,355 +1,172 @@
-# Web SDK Comprehensive Test Suite
-
-## Test Categories
-
-### A. App Load and SDK Initialization
-
-1. Navigate to the app — verify all bottom tabs render (Chat, Vision, Voice, Transcribe, Speak, Docs, Storage, Solutions, Settings)
-2. Verify the runtime badge appears in top-right (`CPU` or `WebGPU`, proving the WASM backend loaded)
-3. Check console for SDK initialization logs: "RunAnywhere Web SDK initialized successfully"
-4. Check console for backend registration: "LlamaCpp backend registered"; ONNX/Sherpa registration is blocked until WASM static archives are vendored
-5. Verify no JavaScript errors in console (exclude expected WASM warnings)
-
-### B. Model Registry and Catalog
-
-1. Open the model selector (Chat > Get Started) — verify models are listed
-2. Verify each model shows "LlamaCpp" framework badge (proves multi-package imports work)
-3. Verify model sizes are displayed (e.g. "250 MB", "500 MB")
-4. Close the model selector without downloading — verify no side effects
-
-### C. Model Download and OPFS Persistence
-
-1. Download the smallest model (LFM2 350M Q4_K_M, ~250 MB)
-2. Verify download progress shows in UI
-3. After download completes, verify model shows as "downloaded" in Storage tab
-4. Verify OPFS contains the model file (check via JS API)
-5. Refresh the page — verify model still shows as "downloaded" (OPFS persistence fix)
-6. Verify model size and "Last used" timestamp are correct after refresh
-
-### D. Model Loading into WASM Memory
-
-1. After download, load the model (click on it in the model selector)
-2. Verify model status changes to "loaded"
-3. Verify the chat input becomes available
-4. Send a test message and verify text generation starts (tokens stream in)
-5. Verify generation completes with a response
-
-### E. Model Unloading and Switching
-
-1. After generation, go to Storage tab — verify model shows as "loaded"
-2. Try loading a different model — verify the previous one is unloaded first
-3. After unloading, verify model status returns to "downloaded"
-
-### F. Storage Tab — Local File Storage
-
-1. Navigate to Storage tab — verify "Browser Storage (OPFS)" label shown
-2. Verify "Choose Storage Folder" button is present
-3. Verify "Import Model File" button is present
-4. Verify storage stats show correct model count, total size, available space
-5. Verify quota bar renders with correct proportions
-
-### G. Import Model File
-
-1. Click "Import Model File" button — verify file picker opens (or input fallback)
-2. Cancel the file picker — verify no crash, no side effects
-3. (If possible) Import a model file — verify it appears in the model list
-
-### H. Drag and Drop (Desktop)
-
-1. Verify drag-drop zone appears when dragging files over Storage tab
-2. Verify drag-drop zone disappears when dragging away
-
-### I. Model Deletion
-
-1. In Storage tab, click "Delete" on a model
-2. Verify confirmation dialog appears
-3. Cancel deletion — verify model is still there
-4. Confirm deletion — verify model is removed from list
-5. Verify OPFS no longer contains the deleted model
-6. Verify model status returns to "registered" in the model selector
-
-### J. Clear All Models
-
-1. Download a model, then click "Clear All Models"
-2. Verify confirmation dialog appears
-3. Confirm — verify all models cleared
-4. Verify OPFS is empty
-
-### K. Cross-Tab Navigation
-
-1. Navigate to each tab and verify UI renders without errors: Chat, Vision, Voice, Transcribe, Speak, Docs, Storage, Solutions, Settings
-2. Navigate rapidly between tabs — verify no crashes
-
-### L. Console Error Audit
-
-1. After all tests, collect all console errors
-2. Classify: expected (WASM fallback) vs unexpected (real bugs)
-
-### M. Settings Tab
-
-1. Navigate to Settings — verify Temperature slider renders with value "0.7"
-2. Adjust Temperature slider — verify display updates (0.0–2.0, step 0.1)
-3. Verify Max Tokens stepper shows default value (e.g. 2048)
-4. Click minus button — verify token count decreases by 500 (min 500)
-5. Click plus button — verify token count increases by 500 (max 20000)
-6. Verify API Key input field renders (type=password)
-7. Verify Base URL input field renders
-8. Verify Analytics toggle renders and is clickable
-9. Verify "Documentation" link points to runanywhere.ai docs
-10. Verify About section shows SDK version and platform info
-11. Change settings, refresh page — verify settings persist via localStorage
-
-### N. Chat Tab — UI Interaction Details
-
-1. Verify Send button is disabled when input is empty
-2. Type a message — verify Send button enables
-3. Verify Enter key submits message (without Shift)
-4. Verify Shift+Enter creates a newline (does not submit)
-5. Verify suggestion chips render on empty state (4 chips)
-6. Click a suggestion chip — verify it fills input and sends
-7. Verify "Get Started" overlay appears when no model loaded
-8. Click "Get Started" — verify model selection sheet opens
-9. Verify Tools toggle button renders with label "Tools"
-10. Click Tools toggle — verify toggle changes state and badge appears
-11. Verify New Chat button clears conversation when messages exist
-12. Verify model selector button in toolbar shows "Select Model" initially
-13. Verify empty state (robot icon + "Start a conversation") shows initially
-
-### O. Vision Tab — UI Elements
-
-1. Navigate to Vision — verify model overlay with "Get Started" button appears
-2. Verify camera container area renders
-3. Verify capture button (bulb icon) renders
-4. Verify live mode toggle button renders
-5. Verify description panel renders (initially empty)
-6. Verify copy button renders in description panel
-7. Verify model selector in toolbar shows "Select Vision Model"
-8. Verify metrics area renders (hidden until first capture)
-
-### P. Voice Tab — Pipeline Setup
-
-1. Navigate to Voice — verify the feature-unavailable placeholder renders
-2. Verify the placeholder explains ONNX/Sherpa artifact requirements
-3. Verify there are no console/page errors
-
-### Q. Transcribe Tab — Mode Controls
-
-1. Navigate to Transcribe — verify backend status shows ONNX unavailable
-2. Verify the placeholder or disabled flow explains that `RunAnywhere.transcribe` requires `RAC_WASM_ONNX=ON`
-3. Verify no real transcription is marked PASS until ONNX/Sherpa exports exist
-
-### R. Speak Tab — Controls
-
-1. Navigate to Speak — verify backend status shows ONNX unavailable
-2. Verify the placeholder or disabled flow explains that `RunAnywhere.synthesize` requires `RAC_WASM_ONNX=ON`
-3. Verify no real synthesis is marked PASS until ONNX/Sherpa/Piper exports exist
-
-### S. Model-Switch Banner [planned]
-
-> **Planned feature.** No model-switch banner is implemented yet — only orphan
-> `.model-switch-banner` CSS selectors remain in `src/styles/components.css`.
-> Skip this section until the banner ships; the steps below describe the
-> intended behavior for the future implementation.
-
-1. Load an LLM model on Chat tab, then switch to Vision tab — verify model-switch banner appears
-2. Verify banner text explains model category difference
-3. Click dismiss button — verify banner disappears
-4. Switch between tabs with same model category — verify no banner appears
-
-### T. Acceleration Badge
-
-1. Verify acceleration badge renders on page load
-2. Verify badge text is "CPU" or "WebGPU" based on hardware
-3. Verify badge is visible in all tabs (persists across navigation)
-
-### U. Telemetry Verification — Development Mode (Supabase)
-
-This section verifies that analytics telemetry is correctly sent to the Supabase backend
-in development mode. Credentials are embedded in the WASM module via `development_config.cpp`.
-
-**Dev Endpoint:** `https://<dev-project-id>.supabase.co/rest/v1/telemetry_events` *(URL redacted — stored in dev config)*
-
-**Verification method:** Use DevTools Network tab or Playwright `browser_network_requests` to inspect HTTP POSTs.
-
-#### U1. SDK Init — Device Registration & Telemetry Setup
-
-1. Open app — check console for:
-   - `[INFO] [RunAnywhere:HTTPService] Development mode configured with Supabase`
-   - `[INFO] [RunAnywhere:TelemetryService] HTTPService configured with WASM dev config (Supabase)`
-   - `[INFO] [RunAnywhere:TelemetryService] TelemetryService initialized (env=development, device=<uuid>...)`
-   - `[INFO] [RunAnywhere:AnalyticsEventsBridge] Analytics events callback registered`
-2. Check `localStorage['rac_device_id']` — verify it is a UUID (e.g. `de9a040f-...`, 36 chars)
-3. Refresh page — verify `rac_device_id` is **the same** UUID (persistent)
-
-#### U2. Dev Telemetry POST — Network Inspection
-
-After SDK init (backend registration completes), check Network tab for:
-
-1. At least one POST to the dev Supabase telemetry endpoint (check Network tab — URL contains `supabase.co/rest/v1/telemetry_events`)
-2. Response status: `200` or `201` (or `204` for Supabase upsert)
-3. Request headers include:
-   - `Content-Type: application/json`
-   - `apikey: <supabase-anon-key>` (starts with `eyJ`)
-   - `Authorization: Bearer <supabase-anon-key>`
-4. Request body is valid JSON array or object
-
-#### U3. Telemetry Payload — Required Common Fields
-
-Inspect the POST body of any telemetry request and verify these fields are present:
-
-| Field | Expected Value |
-|-------|---------------|
-| `event_type` | Non-empty string (e.g. `"llm.backend.registered"`) |
-| `device_id` | UUID matching `localStorage['rac_device_id']` |
-| `platform` | `"web"` |
-| `sdk_version` | `"0.1.0-beta.8"` (or current version) |
-| `timestamp_ms` | Integer Unix timestamp in milliseconds |
-| `modality` | `"llm"`, `"stt"`, `"tts"`, `"model"`, or `"system"` |
-
-#### U4. Telemetry — LLM Generation Event
-
-*(Requires downloading and loading an LLM model, then running a chat generation)*
-
-After `LlamaCPP.register()` and a text generation, verify a POST contains:
-
-| Field | Expected |
-|-------|---------|
-| `event_type` | `"llm.generation.completed"` |
-| `modality` | `"llm"` |
-| `output_tokens` | Integer > 0 |
-| `tokens_per_second` | Float > 0 |
-| `generation_time_ms` | Float > 0 |
-| `time_to_first_token_ms` | Float ≥ 0 |
-| `model_id` | Non-empty string |
-| `framework` | `"llamacpp"` |
-| `platform` | `"web"` |
-
-#### U5. Telemetry — LLM Model Load Event
-
-After loading an LLM model, verify a POST contains:
-
-| Field | Expected |
-|-------|---------|
-| `event_type` | `"llm.model.load.completed"` |
-| `modality` | `"llm"` |
-| `model_id` | Non-empty string |
-| `processing_time_ms` | Float > 0 (load duration) |
-| `model_size_bytes` | Integer > 0 |
-| `framework` | `"llamacpp"` |
-| `platform` | `"web"` |
-
-#### U6. Telemetry — STT Transcription Event [requires RAC_WASM_ONNX=ON]
-
-*(Requires a build with `RAC_WASM_ONNX=ON` plus an ONNX backend loaded with a Whisper STT model and microphone input. On the default Web build the Transcribe tab renders a placeholder per Section Q, so this telemetry assertion is unreachable.)*
-
-After a transcription completes, verify a POST contains:
-
-| Field | Expected |
-|-------|---------|
-| `event_type` | `"stt.transcription.completed"` |
-| `modality` | `"stt"` |
-| `audio_duration_ms` | Float > 0 |
-| `real_time_factor` | Float > 0 |
-| `word_count` | Integer ≥ 0 |
-| `confidence` | Float 0.0–1.0 |
-| `model_id` | Non-empty string |
-| `framework` | `"onnx"` |
-| `platform` | `"web"` |
-
-#### U7. Telemetry — TTS Synthesis Event [requires RAC_WASM_ONNX=ON]
-
-*(Requires a build with `RAC_WASM_ONNX=ON` plus an ONNX backend loaded with a Piper TTS model and Speak tab usage. On the default Web build the Speak tab renders a placeholder per Section R, so this telemetry assertion is unreachable.)*
-
-After a TTS synthesis completes, verify a POST contains:
-
-| Field | Expected |
-|-------|---------|
-| `event_type` | `"tts.synthesis.completed"` |
-| `modality` | `"tts"` |
-| `character_count` | Integer > 0 |
-| `characters_per_second` | Float > 0 |
-| `output_duration_ms` | Float > 0 |
-| `audio_size_bytes` | Integer > 0 |
-| `sample_rate` | Integer (e.g. 22050 or 44100) |
-| `model_id` | Non-empty string |
-| `framework` | `"onnx"` |
-| `platform` | `"web"` |
-
-#### U8. Telemetry — Model Download Event
-
-*(Requires initiating a model download from the model selector)*
-
-During/after model download, verify a POST contains:
-
-| Field | Expected |
-|-------|---------|
-| `event_type` | `"model.download.completed"` |
-| `modality` | `"model"` |
-| `model_id` | Non-empty string |
-| `model_size_bytes` | Integer > 0 |
-| `processing_time_ms` | Float > 0 (download duration) |
-| `platform` | `"web"` |
-
-#### U9. Telemetry — VAD Event [requires RAC_WASM_ONNX=ON]
-
-*(Requires a build with `RAC_WASM_ONNX=ON` plus the Voice tab with VAD active and speech input. On the default Web build the Voice tab renders a placeholder per Section P, so this telemetry assertion is unreachable.)*
-
-When speech activity is detected and ends, verify a POST contains:
-
-| Field | Expected |
-|-------|---------|
-| `event_type` | `"vad.speech.ended"` |
-| `modality` | `"system"` |
-| `speech_duration_ms` | Float > 0 |
-| `platform` | `"web"` |
-
-#### U10. Telemetry Batching Behavior
-
-1. In dev mode (default): telemetry events flush **immediately** on each event (no batching delay)
-2. Verify: after backend registration, a POST fires within 1-2 seconds of the SDK init log
-3. In prod mode: events batch in groups of 10 or flush after 5-second timeout
-
-#### U11. Device ID Persistence
-
-1. Check `localStorage['rac_device_id']` before page reload
-2. Reload page
-3. Check `localStorage['rac_device_id']` after reload — must be **identical**
-4. Verify all telemetry POSTs use the same `device_id` throughout the session
-
-### V. Telemetry Verification — Production Mode
-
-*(Pending: user to provide production API key and base URL)*
-
-**Prod Endpoint:** `<base-url>/api/v1/sdk/telemetry`
-
-#### V1. Configure Production Credentials
-
-To test production telemetry:
-1. Set API key in Settings tab → "API Key" field
-2. Set base URL in Settings tab → "Base URL" field
-3. Or configure via `RunAnywhere.initialize({ apiKey: '...', baseURL: '...' })`
-
-#### V2. Prod Telemetry POST — Network Inspection
-
-After configuring production credentials, repeat U2-U9 tests and verify:
-
-1. POST goes to `<base-url>/api/v1/sdk/telemetry` (NOT Supabase)
-2. Request headers include:
-   - `Authorization: Bearer <api-key>`
-   - `Content-Type: application/json`
-3. Response status: `200` or `202`
-4. Payload fields match the same schema as development (same `rac_telemetry_payload_t` fields)
-
-#### V3. Prod Batching — 10 Events or 5s Timeout
-
-In production mode (unlike dev's immediate flush):
-1. Trigger multiple events (multiple tab switches, multiple tool calls)
-2. Verify batch of 10 events triggers a single POST (not 10 separate POSTs)
-3. Or wait 5 seconds after any event — verify POST fires within 5s timeout
-
----
-
-## Bug Report File
-
-Bugs found during testing will be written to:
-`tests/web-sdk-bugs.md`
+# Manual browser test plan
+
+Automated coverage in this repo is `npm run test` (Vitest, four files under
+`src/`) plus `npm run typecheck`, `npm run lint`, and `npm run build`. None of
+those load WASM or run a model. Everything below is what a person has to do in
+a browser before calling a release good. The Web SDK's own Playwright suite
+lives in the monorepo at `bindings/web/tests/browser/`, not here.
+
+## Setup
+
+1. `npm ci`, then `npm run dev` (or `npm run build && npm run preview`).
+2. Open `http://localhost:3000`. Use `localhost`, not `127.0.0.1`: they are
+   different origins, so OPFS contents and localStorage do not carry across.
+3. In the console, confirm `crossOriginIsolated === true` and
+   `typeof SharedArrayBuffer !== 'undefined'`.
+4. Keep DevTools open on Console and Network for the whole pass.
+
+Some checks need a model on disk. Download one small LLM (the model sheet lists
+sizes) and one Sherpa speech bundle before starting, or run section B first.
+
+## A. Boot
+
+1. The boot screen paints immediately, before the bundle finishes loading, and
+   its status line advances through "Starting the on-device runtime",
+   "Preparing text generation", "Preparing speech", "Checking available models".
+2. The shell appears: top bar with the menu button, brand, model slot, new-chat,
+   theme, and settings buttons; drawer with Assistant, Talk, Choose model,
+   Downloads, Settings, Advanced.
+3. Console shows `[RunAnywhere] llamacpp backend registered: cpu` (or `webgpu`)
+   and `[RunAnywhere] onnx/sherpa backend registered: …`.
+4. Console shows `[RunAnywhere] SDK initialized, version: …` and a
+   `Model registry: registered=…, downloaded=…, available=…` line.
+5. `window.__RUNANYWHERE_AI_READY__.ready === true`, and `<html>` carries
+   `data-runanywhere-ai-ready="true"` with `data-runanywhere-ai-step="interactive"`.
+6. No unexpected console errors.
+
+## B. Model catalog and download
+
+1. Open the model sheet from the drawer's "Choose model" or the chat toolbar.
+2. Rows list a framework, a size, and a state badge. Models the browser cannot
+   run are visibly gated rather than offered.
+3. "Add from Hugging Face" is present in the sheet footer.
+4. Download the smallest LLM. Progress updates, then the row reads as on-device.
+5. Go to Downloads: the model is listed, with the correct size, and storage
+   usage reflects it.
+6. Reload the page. The model still reads as on-device (OPFS survived).
+
+## C. Assistant
+
+1. With no model loaded, the Get Started overlay covers the composer.
+2. Load a model from the sheet. The overlay clears and the toolbar names the
+   model.
+3. Four suggestion chips render on the empty state. Clicking one prefills the
+   composer and focuses it. It does not send.
+4. Send is disabled on an empty composer. Enter submits, Shift+Enter inserts a
+   newline.
+5. Send a prompt. Tokens stream in, then the turn completes with metrics.
+6. Toggle Tools on and ask something that needs one of the three demo tools
+   (weather, current time, calculator). The tool call and its result render.
+7. New chat clears the thread. The drawer's Recent list keeps the previous one,
+   reopening it restores the messages, and deleting it removes it.
+8. Reload with a saved chat selected. It restores from IndexedDB.
+
+## D. Routing
+
+1. Each surface changes the URL fragment (`#/vision`, `#/benchmarks`, and so on).
+2. Reloading on a fragment restores that surface, not the assistant.
+3. Browser Back and Forward move between visited surfaces.
+4. A drilled-into surface (anything under Advanced) shows a Back button in its
+   toolbar that returns to where you actually came from.
+5. Editing the fragment in the address bar navigates.
+6. An unknown fragment falls back to the assistant.
+
+## E. Image and live camera
+
+1. Open Image & Live. With no VLM loaded, controls are disabled and the engine
+   notice explains why.
+2. Load a VLM. Load an image from disk, or start the camera and capture a frame.
+3. Describe the frame. Output streams in and Cancel stops it mid-stream.
+4. Frame metadata and timing render after the first capture.
+
+## F. Speech
+
+Each of these needs the matching Sherpa model downloaded and loaded.
+
+1. Transcribe: record from the microphone and confirm streaming partials, then
+   a final transcript. Drop an audio file and confirm the batch path produces a
+   transcript. Clear empties the output.
+2. Read aloud: enter text, adjust the rate, press Speak, and confirm audio
+   plays. Stop interrupts it mid-utterance.
+3. Voice activity: start listening and confirm the speech pill flips between
+   speech and silence, the confidence readout moves, and the event log fills.
+4. Talk: run setup, start a session, speak, and confirm the transcript, the
+   assistant response, and spoken output. Interrupt cuts the reply off.
+
+## G. Documents
+
+1. Pick an embedding model and an LLM. Download either from its row if missing.
+2. Drop in a `.txt`, `.md`, or `.json` file. It appears in the list and indexes.
+   Drop an unsupported extension and confirm it is rejected with a reason, not
+   silently ignored: a drop bypasses the input's `accept` filter.
+3. Ask a question. The answer streams and lists the retrieved sources.
+4. "Clear all" empties the index. The index is session-only, so a reload clears
+   it too. Confirm the UI says so rather than implying persistence.
+
+## H. Solutions and benchmarks
+
+1. Solutions lists the two packaged workflows, Voice agent and Document Q&A.
+   Running one with its models present produces a result; running one without
+   them fails with a readable per-solution message rather than a silent no-op.
+   The per-solution recheck control re-probes engine availability.
+2. Benchmarks runs one prompt at three token budgets (Short 50, Medium 256,
+   Long 512) and charts time-to-first-token and tokens per second for each.
+   With no model loaded, the run buttons are disabled and the view says to load
+   one.
+
+## I. Downloads and storage
+
+1. The panel names the storage backend (private browser storage, or a chosen
+   folder) and shows per-site usage against the quota.
+2. "Choose Storage Folder" opens the directory picker. Cancelling is a no-op.
+3. If a chosen folder lost permission, the re-authorize control restores access.
+4. Delete removes a model immediately, with a toast and no confirmation prompt.
+   Afterwards the model sheet shows it as not downloaded and usage drops.
+5. "Clear Caches" also runs immediately, with a toast.
+6. A paused or failed transfer offers Delete so partial bytes can be reclaimed,
+   and an in-flight one offers Cancel.
+
+## J. Settings
+
+1. Temperature is a slider from 0 to 2 in steps of 0.1, defaulting to 0.7.
+2. Max Tokens defaults to 10000 and steps by 500 between 500 and 20000. The
+   minus and plus buttons disable at the bounds.
+3. System Prompt and Thinking Mode render. Thinking Mode is off by default.
+4. API Key is a password field, Base URL is a URL field. "Apply & Reinitialize"
+   restarts the runtime; a bad endpoint reports the failure and restores the
+   previous runtime rather than leaving the app broken.
+5. The Hugging Face token field reports Configured or Not set, and Clear resets it.
+6. Analytics is a read-only state row describing the SDK environment. It is not
+   a toggle.
+7. SDK Version matches the installed `@runanywhere/web`, and Documentation links
+   to `https://docs.runanywhere.ai`.
+8. Change a generation setting, reload, and confirm it persisted. Confirm the
+   API key did not.
+
+## K. Degraded and unavailable states
+
+1. Segmentation and Diarization always render the unavailable placeholder, and
+   the placeholder names the SDK verb each would call. No browser engine
+   publishes those capabilities.
+2. Block one WASM artifact in DevTools and reload. The affected engine reports
+   as unavailable, the drawer footer reads "On-device engine unavailable", the
+   picker gates exactly the rows that need it, and the rest of the app stays
+   navigable. Retry recovers without a page reload once the block is lifted.
+3. Serve the built bundle without COOP/COEP headers. The isolation service
+   worker installs, reloads once, and the app comes up isolated. It does not
+   reload in a loop.
+
+## L. Theme and layout
+
+1. The theme button toggles light and dark, and the choice survives a reload.
+2. With no stored choice, the app follows the OS preference, including a change
+   made while the tab is open.
+3. At a 390px viewport the drawer is a scrim overlay, Escape closes it, and
+   nothing overlaps the composer.
+
+## M. Console audit
+
+Collect every console error and network failure from the pass and classify each
+as expected (a capability probe that legitimately fails on this browser) or a
+real defect. Attach screenshots for anything that is not obviously one or the
+other.
