@@ -601,6 +601,51 @@ const CATALOG: readonly CatalogEntry[] = [
     artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
   },
 
+  // --- Supertonic (Supertone) ---
+  {
+    // Supertone's Supertonic 3 (released 2026-05-18): 31-language on-device
+    // TTS. The upstream `Supertone/supertonic-3` HF repo is NOT loadable
+    // as-is: sherpa-onnx's OfflineTtsSupertonicModelConfig hard-requires
+    // --supertonic-unicode-indexer to literally end in ".bin" and reads it as
+    // a raw int32 array (sherpa-onnx/csrc/offline-tts-supertonic-unicode-
+    // processor.cc), and --supertonic-voice-style as a custom packed float32
+    // binary (sherpa-onnx/csrc/offline-tts-supertonic-impl.cc,
+    // ParseVoiceStyleFromBinary) — but upstream ships
+    // `onnx/unicode_indexer.json` and ten separate `voice_styles/*.json`
+    // files, both JSON. Using csukuangfj2's pre-converted sherpa-onnx-native
+    // bundle instead (same publisher already used for the Parakeet/Canary/
+    // Nemotron rows above): exact 7-file set the config requires
+    // (duration_predictor, text_encoder, vector_estimator, vocoder as INT8
+    // ONNX; tts.json; unicode_indexer.bin; voice.bin bundling all ten F1-F5/
+    // M1-M5 styles, selectable by sid 0..9). MIT-licensed (Supertone Inc.),
+    // same as upstream. Confirmed present in this app's exact pinned
+    // sherpa-onnx build: @runanywhere/web-onnx@0.20.19 vendors
+    // SHERPA_ONNX_VERSION_WEB=1.13.4 (core/VERSIONS at the 0.20.19 tag), and
+    // `OfflineTtsSupertonicImpl`/`OfflineTtsSupertonicModelConfig`/the
+    // `--supertonic-*` flags are compiled into the shipped
+    // racommons-onnx-sherpa.wasm.
+    id: 'sherpa-supertonic-3-tts-int8',
+    name: 'Supertone Supertonic 3 TTS INT8 (Sherpa-ONNX)',
+    description:
+      'Supertonic 3 — fast multilingual (31-language) on-device TTS, ten built-in voice styles.',
+    category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+    format: ModelFormat.MODEL_FORMAT_ONNX,
+    downloadUrl:
+      'https://huggingface.co/csukuangfj2/sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4/vector_estimator.int8.onnx',
+    downloadSizeBytes: 145_295_768,
+    memoryRequiredBytes: 195_000_000,
+    files: [
+      { url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4/vector_estimator.int8.onnx', filename: 'vector_estimator.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL, sizeBytes: 78_400_833 },
+      { url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4/text_encoder.int8.onnx', filename: 'text_encoder.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_COMPANION, sizeBytes: 36_416_150 },
+      { url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4/vocoder.int8.onnx', filename: 'vocoder.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_COMPANION, sizeBytes: 25_991_073 },
+      { url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4/duration_predictor.int8.onnx', filename: 'duration_predictor.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_COMPANION, sizeBytes: 3_700_147 },
+      { url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4/voice.bin', filename: 'voice.bin', role: ModelFileRole.MODEL_FILE_ROLE_COMPANION, sizeBytes: 517_168 },
+      { url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4/unicode_indexer.bin', filename: 'unicode_indexer.bin', role: ModelFileRole.MODEL_FILE_ROLE_COMPANION, sizeBytes: 262_144 },
+      { url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-supertonic-3-tts-int8-2026-05-11/resolve/cca5a0e6c96e1d2c720986bf7e75fcc81dee3ae4/tts.json', filename: 'tts.json', role: ModelFileRole.MODEL_FILE_ROLE_CONFIG, sizeBytes: 8_253 },
+    ],
+  },
+
   // ---------- VAD (Silero, ONNX) ----------
   {
     // Preserve iOS catalog parity while sourcing RunAnywhere's immutable,
