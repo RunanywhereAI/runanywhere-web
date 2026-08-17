@@ -15,6 +15,37 @@ const llamacppWasmDir = path.resolve(__dir, 'node_modules/@runanywhere/web-llama
 const onnxWasmDir = path.resolve(__dir, 'node_modules/@runanywhere/web-onnx/wasm');
 
 /**
+ * `@runanywhere/proto-ts` ships as plain CommonJS (`exports.LogLevel = ...`), and
+ * `@runanywhere/web`/`web-llamacpp`/`web-onnx` deep-import dozens of its generated modules
+ * individually (`@runanywhere/proto-ts/logging`, `/sdk_events`, `/convenience/errors_convenience`,
+ * ...) rather than the package root. Vite's dependency scanner only auto-discovers some of these
+ * (its crawl is best-effort, not exhaustive) and serves the rest straight to the browser as raw
+ * files; the browser's native ESM loader then can't see a CJS module's named exports and the app
+ * hangs on the loading splash with "does not provide an export named '...'" — a different export
+ * each time, depending on which undiscovered subpath happens to load first. Enumerating every
+ * generated module here (instead of adding them to `optimizeDeps.include` one crash at a time)
+ * forces esbuild to pre-bundle all of them into real ESM up front, and keeps working automatically
+ * as the SDK's generated proto surface grows.
+ */
+function protoTsDeepImports(): string[] {
+  const distDir = path.resolve(__dir, 'node_modules/@runanywhere/proto-ts/dist');
+  const specifiers: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (entry.name.endsWith('.js') && !entry.name.endsWith('.d.js')) {
+        const rel = path.relative(distDir, full).replace(/\.js$/, '').split(path.sep).join('/');
+        specifiers.push(`@runanywhere/proto-ts/${rel}`);
+      }
+    }
+  };
+  walk(distDir);
+  return specifiers;
+}
+
+/**
  * Vite plugin to copy the canonical Emscripten runtime artifacts into the
  * build output.
  *
@@ -122,6 +153,17 @@ export default defineConfig(({ command }) => {
     },
     optimizeDeps: {
       exclude: ['@runanywhere/web', '@runanywhere/web-llamacpp', '@runanywhere/web-onnx'],
+      // See protoTsDeepImports() above: forces every generated proto-ts module (CJS) into
+      // esbuild's pre-bundle so the browser gets real ESM named exports instead of a raw
+      // CommonJS file it can't read as a module.
+      include: ['@runanywhere/proto-ts', ...protoTsDeepImports()],
+    },
+    resolve: {
+      // npm ci reproduces the lockfile's nested @runanywhere/web/node_modules/@runanywhere/proto-ts
+      // copy verbatim rather than hoisting it, even though it resolves to the same 0.20.24 as the
+      // top-level install. Dedupe forces every resolution to the single top-level copy so there's
+      // only one pre-bundled instance in the module graph.
+      dedupe: ['@runanywhere/proto-ts'],
     },
     assetsInclude: ['**/*.wasm'],
   };
