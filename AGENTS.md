@@ -206,6 +206,34 @@ cutting a release.
 Before handoff run `npm ci`, `npm run lint`, `npm run typecheck`, `npm run
 test`, and a production `npm run build`.
 
+## Production release requirements
+
+**The Vercel dashboard's Production env vars are NOT what feed this build — do not rely on
+them.** `scripts/release.sh deploy` runs the real `vite build` locally in this checkout
+(`npm run release:build`, from the plain project root) and only afterward copies the
+already-built `dist/` into `.vercel-stage/` with `buildCommand`/`installCommand` rewritten
+to `true` — so `vercel build --prod` there is a no-op repackage step, not a real build, and
+never sees the Vercel project's own env var settings. The credentials must instead be a
+local, gitignored `.env` in the actual repo root (`VITE_RUNANYWHERE_API_KEY` /
+`VITE_RUNANYWHERE_BASE_URL`) — same contract as `runanywhere-ios`'s
+`RunAnywhereLocalSecrets.plist`, `runanywhere-android`'s `local.properties`, and
+`runanywhere-electron`'s `.env`. Ask a maintainer for current production credentials. Never
+hardcode them in source.
+
+After changing `.env`, always rebuild before deploying (`npm run release:build` /
+`npm run release:deploy`) and verify the key actually landed by grepping the built
+`dist/assets/*.js` for a distinctive substring of it — do not trust the Settings page's
+"Analytics" environment label as proof either way: it is driven by a UI-only variable that
+defaults to `'development'` and only updates when a user manually submits the Settings
+form, never by the actual boot-time hosted configuration. The real signal is whether the
+deployed app's network requests on load actually hit the production base URL (confirms the
+SDK booted with real credentials) — check that instead of the Settings label.
+
+The canonical public URL (`<project>.vercel.app`, no team-name suffix) is not behind Vercel
+Deployment Protection even when the team-suffixed alias/per-deployment URLs are; after a
+new prod deploy, explicitly `vercel alias set <new-deployment-url> <project>.vercel.app` —
+`vercel deploy --prebuilt --prod` does not automatically repoint that bare alias.
+
 The app publishes `window.__RUNANYWHERE_AI_READY__` (a readiness snapshot),
 `window.__RUNANYWHERE_SDK__`, and mirrored `data-runanywhere-ai-*` attributes on
 `<html>`. That is the contract browser harnesses probe; keep it stable.
