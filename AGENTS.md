@@ -102,11 +102,11 @@ cannot reach the token layer.
 
 ## Commands
 
-Run from the repository root. Vite 8 requires Node 20.19 or 22.12, and the
-`engines` field mirrors that. Production output is pinned to `chrome86` in
-`vite.config.ts` so a Vite major upgrade cannot silently raise the Web SDK's
-documented browser floor. That target does not polyfill missing browser APIs;
-WebGPU stays optional and falls back to CPU.
+Run from the repository root. Node must satisfy `engines` (`>=22.12.0`).
+Production output is pinned to `chrome86` in `vite.config.ts` so a Vite major
+upgrade cannot silently raise the Web SDK's documented browser floor. That
+target does not polyfill missing browser APIs; WebGPU stays optional and falls
+back to CPU.
 
 ```bash
 npm ci          # pulls the @runanywhere/* packages, JS and WASM
@@ -117,17 +117,14 @@ npm run build
 npm run dev     # http://localhost:3000, COOP/COEP enabled
 ```
 
-Production Vercel releases use `npm run release:deploy`. It builds the app,
-verifies `dist`, builds an isolated static Vercel prebuilt output, rejects
-unexpected serverless functions, and deploys that exact output. No Vercel
-secrets, relay, or WAF configuration is required, and no Emscripten toolchain
-is needed because the WASM ships inside the installed SDK packages. After
-deployment, check the COOP/COEP headers, `crossOriginIsolated`, SPA routing,
-and all five canonical JS/WASM pairs.
+To cut a production release (build, verify, deploy to Vercel, and the required
+post-deploy browser pass), use the `runanywhere-web-release` skill rather than
+running `release:deploy` ad hoc.
 
-`scripts/` holds exactly one tool, `release.sh`, which owns release
-verification, staging, and deployment. Extend it or add an npm script rather
-than another single-use wrapper.
+`scripts/` holds `release.sh`, which owns release verification, staging, and
+deployment, plus `sync-skills.sh` (regenerates the `.agents/skills` mirror of
+`.claude/skills` for non-Claude tooling — never hand-edit the mirror). Extend
+`release.sh` or add an npm script rather than another single-use wrapper.
 
 `src/services/solutions-config.ts` is vendored, not generated here. Upstream is
 `core/examples/solutions/*.yaml` in the SDK monorepo. The generator that
@@ -137,25 +134,9 @@ comment still names pre-0.20.17 monorepo paths.)
 
 ## SDK surface by view
 
-The app uses the namespaced facade throughout. Nothing calls the flat
-deprecated aliases.
-
-| Surface | View file | SDK calls |
-|---|---|---|
-| Assistant | `views/chat.ts` | `llm.generateStream`, `llm.generate`, `llm.tools.register`, `runtime.modalities.llm.status` |
-| Talk | `views/voice.ts` | `voice.createSession` |
-| Advanced | `app.ts` (`initAdvancedHub`) | navigation hub only, no inference |
-| Image & Live | `views/vision.ts` | `vlm.generateStream`, `ImageInput.rawRgb`, `VideoCapture` |
-| Transcribe | `views/transcribe.ts` | `stt.transcribe`, `stt.transcribeStream`, `AudioInput.float32`, `AudioCapture`, `AudioFileLoader` |
-| Read Aloud | `views/speak.ts` | `tts.speak`, then `SpeechHandle.interrupt()` to stop |
-| Voice Activity | `views/vad.ts` | `vad.detectStream`, `AudioInput.float32`, `AudioCapture` |
-| Segmentation | `views/segmentation.ts` | `segmentation.segment`, `ImageInput.rawRgba`. No browser engine publishes the capability, so the catalog is empty and the view renders the unavailable placeholder |
-| Diarization | `views/diarization.ts` | `diarization.diarize`, `AudioInput.float32`. Same gate as Segmentation. There is no `diarizeStream` verb on Web |
-| Documents | `views/documents.ts` | `rag.open`, then `RagSession.ingest`; `models.list`, `models.get`, `models.download` |
-| Downloads | `views/storage.ts` | `storage.{clearCaches,chooseDirectory,directoryName,requestAccess,isReady,backend,isSupported}`, `models.{state,list,delete}` |
-| Solutions | `views/solutions.ts` | `solutions.run`, `rag.open` |
-| Benchmarks | `views/benchmarks.ts` | `llm.generateStream`. LLM only; iOS also covers STT, TTS, and VLM |
-| Settings | `views/settings.ts` | `setHuggingFaceToken`, `version`, `isReady`, plus the reinitialization handler in `main.ts` |
+The app uses the namespaced facade throughout — nothing calls the flat
+deprecated aliases. Full per-surface table (view file → SDK calls):
+[`docs/reference/sdk-surface-by-view.md`](docs/reference/sdk-surface-by-view.md).
 
 Only Segmentation and Diarization render `renderModalityUnavailable`. Chat gates
 on `runtime.modalities.llm.status`; Vision, Transcribe, Speak, VAD, and
@@ -166,34 +147,20 @@ Voice does not gate at all: it calls the verb and surfaces the SDK's typed
 
 ## WASM artifacts
 
-Runtime assets are copied out of the installed packages
-(`node_modules/@runanywhere/{web,web-llamacpp,web-onnx}/wasm`). Five
-independently built execution artifacts ship across three packages: CPU and
-WebGPU are separate builds for both llama.cpp and Sherpa.
-
-| Pair | Package | Loaded by | Used by |
-|---|---|---|---|
-| `racommons.{js,wasm}` | `@runanywhere/web` | `RunAnywhere.initialize()` | every surface |
-| `racommons-llamacpp.{js,wasm}` | `@runanywhere/web-llamacpp` | `LlamaCPP.register()` | Assistant, Image & Live, Documents, Benchmarks |
-| `racommons-llamacpp-webgpu.{js,wasm}` | `@runanywhere/web-llamacpp` | same call, chosen by the runtime capability probe | same, when WebGPU and Asyncify are available |
-| `racommons-onnx-sherpa.{js,wasm}` | `@runanywhere/web-onnx` | `ONNX.register()` | Talk, Transcribe, Read Aloud, Voice Activity, embeddings and RAG |
-| `racommons-onnx-sherpa-webgpu.{js,wasm}` | `@runanywhere/web-onnx` | same call, ORT WebGPU EP path | same, when the EP probe succeeds |
-
-Speech acceleration is independent of LLM acceleration. `ONNX.register()` takes
-its own `acceleration` and `threads`, and `RunAnywhere.runtime.speech` reports
-the result separately from `RunAnywhere.runtime.active`.
+Five independently built execution artifacts ship across three packages (CPU
+and WebGPU builds of both llama.cpp and Sherpa), copied out of the installed
+`@runanywhere/*` packages by the `copy-wasm` Vite plugin. Full pair/package/
+loader table and the pthread-glue rationale:
+[`docs/reference/wasm-artifacts.md`](docs/reference/wasm-artifacts.md).
 
 STT, TTS, and VAD run through the proto-byte adapters in `@runanywhere/web`
-against the Sherpa vtable inside `racommons-onnx-sherpa.wasm`. There is no
-standalone speech provider path and no `wasm/sherpa/` directory.
-
-Every canonical `.js` in the table is required Emscripten runtime glue, not
-build input. Vite emits a hashed copy for the main-thread import, and
-pthread-enabled modules additionally load their canonical self-name from
-workers. The WebGPU and Asyncify artifacts are deliberately non-threaded, but
-their canonical glue is still required. Production output must contain and
-serve all five canonical pairs with JavaScript and `application/wasm` MIME
-types, never an SPA HTML fallback.
+against the Sherpa vtable inside `racommons-onnx-sherpa.wasm` — there is no
+standalone speech provider path and no `wasm/sherpa/` directory. Production
+output must contain and serve all five canonical JS/WASM pairs, never an SPA
+HTML fallback; `scripts/release.sh verify` and the plugin's `buildStart` check
+both enforce this before a bundle ships. Diffusion is a core facade with no
+browser engine and no publishable WASM — do not show it as available and do
+not add it to packaging.
 
 ## Boot and availability rules
 
@@ -225,8 +192,6 @@ Rules that follow from that:
 - Retry is a runtime restart, not a page reload: `retryEngineRegistration()`
   tears down and re-runs `startRuntime`, preserving conversations and the
   current tab. It serializes against a Settings apply through a shared promise.
-- Diffusion is a core facade with no browser engine and no publishable WASM.
-  Do not show it as available and do not add it to packaging.
 
 ## Validation
 
@@ -234,21 +199,12 @@ A passing build or app launch is smoke validation only. End-to-end modality
 validation needs a real browser, a model download, a model load, real
 inference, and reviewed logs and screenshots. Automated release coverage lives
 with the Web SDK in its own `bindings/web/tests/browser/` Playwright suite, not
-here. `tests/web-sdk-test-suite.md` is this repo's manual checklist.
+here. [`tests/web-sdk-test-suite.md`](tests/web-sdk-test-suite.md) is this
+repo's manual checklist; the `runanywhere-web-release` skill runs it as part of
+cutting a release.
 
 Before handoff run `npm ci`, `npm run lint`, `npm run typecheck`, `npm run
-test`, and a production `npm run build`. When a Web SDK checkout is available,
-also run its typecheck, lint, unit tests, build, `npm run test:browser:smoke`,
-and the opt-in `npm run test:browser:release` journey against a packed
-candidate installed here.
-
-A full release must exercise navigation and honest empty and error states, plus
-real LLM, VLM, batch and streaming STT, TTS playback, VAD, the voice session,
-Documents RAG, Solutions, storage and persistence, model switching, Settings
-reinitialization, CPU fallback, and WebGPU where supported. Review console and
-page errors, failed network requests, COOP/COEP state, all five JS/WASM pairs,
-and repeat the smoke and inference checks on the deployed Vercel origin. A
-build-only or download-only result is not a release.
+test`, and a production `npm run build`.
 
 The app publishes `window.__RUNANYWHERE_AI_READY__` (a readiness snapshot),
 `window.__RUNANYWHERE_SDK__`, and mirrored `data-runanywhere-ai-*` attributes on
