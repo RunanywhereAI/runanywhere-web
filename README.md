@@ -4,6 +4,20 @@ A browser app built on the RunAnywhere Web SDK. Models download to the browser
 and run there via WebAssembly, with a WebGPU path where the browser and the
 model support it. Prompts, audio, images, and documents stay on the device.
 
+## Screenshots
+
+Captured in a Chromium browser with WebGPU active, running PrismML Bonsai 1.7B
+through the llama.cpp WASM build.
+
+| | |
+|---|---|
+| ![Chat](docs/screenshots/01-chat.jpg) | ![Choosing a model](docs/screenshots/02-model-picker.jpg) |
+| An answer generated in the browser tab. The badge in the corner shows WebGPU is in use. | The picker recommends a model for the machine and reports what the browser can do. |
+| ![Talk](docs/screenshots/03-voice.jpg) | ![SDK utilities](docs/screenshots/04-advanced.jpg) |
+| Talk assembles a speech-to-text, chat, text-to-speech and voice-detection model, then runs the conversation in the tab. | The lower-level surfaces: transcribe, read aloud, voice activity, diarization, segmentation, benchmarks, solutions. |
+| ![Downloads](docs/screenshots/05-downloads.jpg) | ![Settings](docs/screenshots/06-settings.jpg) |
+| What is on disk and what it costs. Browser storage is private to the site unless you pick a folder. | Sampling, the system prompt, and optional API credentials. |
+
 ## What works
 
 | Surface | What it does | SDK entry point |
