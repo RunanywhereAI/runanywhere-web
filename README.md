@@ -35,13 +35,13 @@ own disk, so the second visit starts instantly.
 
 ## What it looks like
 
-Captured in a Chromium browser with WebGPU active, running PrismML Bonsai 1.7B through the
-llama.cpp WASM build.
+Captured in a Chromium browser with WebGPU active, running a small GGUF chat model through
+the llama.cpp WASM build.
 
 | | |
 |---|---|
 | ![Chat](docs/screenshots/01-chat.jpg) | ![Choosing a model](docs/screenshots/02-model-picker.jpg) |
-| An answer generated in the browser tab. The badge in the corner shows WebGPU is in use. | The picker recommends a model for the machine and reports what the browser can do. |
+| An answer generated in the browser tab. The badge in the corner shows WebGPU is in use. | Models are grouped by who published them. The picker recommends one for the machine and reports what the browser can do. |
 | ![Talk](docs/screenshots/03-voice.jpg) | ![SDK utilities](docs/screenshots/04-advanced.jpg) |
 | Talk assembles a speech-to-text, chat, text-to-speech and voice-detection model, then runs the conversation in the tab. | The lower-level surfaces: transcribe, read aloud, voice activity, diarization, segmentation, benchmarks, solutions. |
 | ![Downloads](docs/screenshots/05-downloads.jpg) | ![Settings](docs/screenshots/06-settings.jpg) |
@@ -65,6 +65,16 @@ The image files are in [`docs/screenshots/`](docs/screenshots).
 
 Segmentation and Diarization have views wired up, but no browser engine registers those
 capabilities yet, so both tabs show an unavailable placeholder.
+
+## Models
+
+The picker groups models by publisher, so you pick a name you recognise and then a size. It
+carries current-generation open models across chat, vision, speech, and embedding. Sizes
+shown are measured, not estimated.
+
+A browser tab is the tightest of the four runtimes: WASM32 gives a 4 GiB address space and
+the runtime needs headroom inside it, so the picker reports what your browser can actually
+hold and marks the rest as out of reach rather than letting a download fail late.
 
 ## Build it yourself
 
