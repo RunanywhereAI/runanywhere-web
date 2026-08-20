@@ -978,18 +978,9 @@ interface LoraCatalogEntry {
   defaultScale: number;
 }
 
-const LORA_ADAPTERS: readonly LoraCatalogEntry[] = [
-  {
-    id: 'abliterated-lora',
-    name: 'Abliterated LoRA (F16)',
-    description: 'Removes refusal behavior — model answers directly without disclaimers',
-    url: 'https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/qwen2.5-0.5b-abliterated-lora-f16.gguf',
-    filename: 'qwen2.5-0.5b-abliterated-lora-f16.gguf',
-    compatibleModels: ['qwen2.5-0.5b-instruct-q6_k'],
-    sizeBytes: 17_620_224,
-    defaultScale: 1.0,
-  },
-];
+// The only adapter we shipped was trained for qwen2.5-0.5b, which this catalog
+// no longer carries. Re-add an adapter and its base together.
+const LORA_ADAPTERS: readonly LoraCatalogEntry[] = [];
 
 // ---------------------------------------------------------------------------
 // Registration — delegated to `RunAnywhere.models.register`.
