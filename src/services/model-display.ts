@@ -325,18 +325,26 @@ const ORG_MATCHERS: ReadonlyArray<{
   },
   { key: 'deepseek', name: 'DeepSeek', test: /deepseek/ },
   { key: 'prism', name: 'Prism', test: /bonsai|prismml|prism-?ml/ },
-  { key: 'microsoft', name: 'Microsoft', test: /\bphi\b/ },
+  { key: 'deepgrove', name: 'Deepgrove', test: /maple/ },
+  { key: 'ibm', name: 'IBM', test: /granite/ },
+  // `fara` rides with Microsoft's `phi`: Fara1.5 ships mirrored under our own HF
+  // org, so the catalog row names no upstream publisher. Filing it by its own
+  // name beats guessing one into a UI label.
+  { key: 'microsoft', name: 'Microsoft', test: /\bphi\b|fara/ },
   { key: 'google', name: 'Google', test: /gemma|embeddinggemma|siglip/ },
-  { key: 'meta', name: 'Meta', test: /llama/ },
+  // Muse Glimmer is Meta's, per the catalog row's own name, but this rule
+  // matched only the Llama family.
+  { key: 'meta', name: 'Meta', test: /llama|muse-glimmer|muse_glimmer/ },
   { key: 'alibaba', name: 'Alibaba', test: /qwen/ },
   { key: 'liquid', name: 'Liquid AI', test: /lfm2/ },
-  { key: 'mistral', name: 'Mistral AI', test: /mistral/ },
+  { key: 'mistral', name: 'Mistral AI', test: /mistral|ministral/ },
   { key: 'hugging-face', name: 'Hugging Face', test: /smollm|smolvlm/ },
   { key: 'openai', name: 'OpenAI', test: /whisper/ },
+  { key: 'zhipu', name: 'Zhipu AI', test: /\bglm\b|glm-/ },
   {
     key: 'open-source',
     name: 'Open source',
-    test: /internvl|lama_dilated|moonshine|melo|kokoro|kitten|piper|vits|silero|vad|minilm|soprano|pocket-tts|glm-asr/,
+    test: /internvl|lama_dilated|moonshine|melo|kokoro|kitten|piper|vits|silero|vad|minilm|soprano|pocket-tts|supertonic/,
   },
 ];
 

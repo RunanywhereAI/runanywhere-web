@@ -45,20 +45,28 @@ export interface RecommendedSelection {
  * Curated LLM id preference order (presentation). Fit is decided by can_run,
  * not by these lists.
  */
+// Ordered by how good the model is, not how small it is. `isRecommendable`
+// already refuses anything the WASM32 address space cannot hold, so this list
+// states a preference and lets the fit gate do the excluding.
+//
+// Five of the previous eight ids no longer existed in the catalog, so the
+// back-fill below was doing all the work and the "recommended" section was
+// really just catalog order.
 const LLM_PREFERENCE: readonly string[] = [
+  'qwen3.5-2b-q4_k_m',
+  'lfm2.5-1.2b-instruct-q4_k_m',
+  'qwen3.5-0.8b-q4_k_m',
+  'granite-4.1-3b-q4_k_m',
+  'lfm2.5-1.2b-thinking-q4_k_m',
+  'gemma-4-e2b-it-q4_k_m',
+  'lfm2.5-230m-q4_k_m',
   'bonsai-1.7b-q1_0',
-  'bonsai-4b-q1_0',
-  'bonsai-8b-q1_0',
-  'qwen2.5-0.5b-instruct-q6_k',
-  'qwen3-0.6b-q4_k_m',
-  'qwen3-4b-q4_k_m',
-  'lfm2-350m-q4_k_m',
-  'smollm2-360m-q8_0',
 ];
 
 const VLM_PREFERENCE: readonly string[] = [
-  'lfm2-vl-450m-q8_0',
   'smolvlm2-256m-video-instruct-q8_0',
+  'smolvlm-500m-instruct-q8_0',
+  'lfm2.5-vl-1.6b-q4_k_m',
 ];
 
 const ASR_PREFERENCE: readonly string[] = ['sherpa-onnx-whisper-tiny.en'];

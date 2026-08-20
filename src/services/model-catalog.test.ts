@@ -26,10 +26,14 @@ describe('Web catalog integrity', () => {
 
   it('keeps one quantization per llama.cpp model', () => {
     // Two quants of the same model cost a catalog slot and a "which one?"
-    // decision without adding a capability. lfm2-350m-q8_0 is the row this
-    // rule drops (the file header documents the omission).
-    expect(getCatalog().some(({ id }) => id === 'lfm2-350m-q8_0')).toBe(false);
-    expect(getCatalog().some(({ id }) => id === 'lfm2-350m-q4_k_m')).toBe(true);
+    // decision without adding a capability. Asserted over the whole catalog
+    // rather than one example row, so it keeps holding as models turn over.
+    const quant = /-(q\d[_a-z0-9]*|tq\d_\d|iq\d[_a-z0-9]*)$/;
+    const bases = getCatalog()
+      .filter(({ format }) => format === ModelFormat.MODEL_FORMAT_GGUF)
+      .map(({ id }) => id.replace(quant, ''));
+
+    expect(bases).toEqual([...new Set(bases)]);
   });
 
   it('registers the LFM2.5 230M Q4_K_M row and clears the WASM32 gate', () => {
