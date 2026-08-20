@@ -191,6 +191,80 @@ const CATALOG: readonly CatalogEntry[] = [
     contextLength: 4096,
     supportsThinking: true,
   },
+  {
+    id: 'qwen3.5-0.8b-q4_k_m',
+    name: 'Qwen3.5 0.8B Q4_K_M',
+    description: 'Latest-generation compact Qwen; smallest chat model that still follows tool syntax.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf',
+    downloadSizeBytes: 532_517_120,
+    memoryRequiredBytes: 900_000_000,
+    contextLength: 4096,
+    supportsThinking: true,
+  },
+  {
+    id: 'qwen3.5-2b-q4_k_m',
+    name: 'Qwen3.5 2B Q4_K_M',
+    description: 'Mid-size Qwen3.5; the default chat model on the desktop builds.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf',
+    downloadSizeBytes: 1_280_835_840,
+    memoryRequiredBytes: 1_800_000_000,
+    contextLength: 4096,
+    supportsThinking: true,
+  },
+  {
+    id: 'qwen3.5-4b-q4_k_m',
+    name: 'Qwen3.5 4B Q4_K_M',
+    description: 'Largest Qwen3.5 that still clears the 4 GiB WASM32 address space.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf',
+    downloadSizeBytes: 2_740_937_888,
+    memoryRequiredBytes: 3_200_000_000,
+    contextLength: 4096,
+    supportsThinking: true,
+  },
+
+  // --- Granite 4.1 (IBM) ---
+  {
+    id: 'granite-4.1-3b-q4_k_m',
+    name: 'IBM Granite 4.1 3B Q4_K_M',
+    description: 'Apache-2.0 instruction model tuned for retrieval and tool use.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/unsloth/granite-4.1-3b-GGUF/resolve/main/granite-4.1-3b-Q4_K_M.gguf',
+    downloadSizeBytes: 2_099_502_400,
+    memoryRequiredBytes: 2_600_000_000,
+    contextLength: 4096,
+  },
+
+  // --- Gemma 4 (Google DeepMind) ---
+  // E2B only. The E4B weights are 4.98 GB, which cannot fit the WASM32 address
+  // space no matter how much RAM the machine has.
+  {
+    id: 'gemma-4-e2b-it-q4_k_m',
+    name: 'Gemma 4 E2B IT Q4_K_M',
+    description: 'Multimodal-capable Gemma 4 in its smallest instruction-tuned size.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf',
+    downloadSizeBytes: 3_106_738_272,
+    memoryRequiredBytes: 3_400_000_000,
+    contextLength: 4096,
+  },
 
   // --- LFM2 / LFM2.5 (Liquid AI) ---
   {
