@@ -124,73 +124,6 @@ const WASM32_ADDRESS_SPACE_BYTES = 2 ** 32;
 const MINIMUM_WASM_RUNTIME_HEADROOM_BYTES = 512 * 1024 * 1024;
 
 const CATALOG: readonly CatalogEntry[] = [
-  // ---------- LLM (llama.cpp) ----------
-
-  // --- SmolLM2 (HuggingFaceTB) ---
-  {
-    // Preserve the cross-SDK model ID while using the model author's official
-    // instruction-tuned artifact; the historical base-model URL cannot
-    // reliably follow chat instructions.
-    id: 'smollm2-360m-q8_0',
-    name: 'SmolLM2 360M Q8_0',
-    description: 'Small instruction-tuned LLM that runs in the WASM build.',
-    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-    format: ModelFormat.MODEL_FORMAT_GGUF,
-    downloadUrl:
-      'https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/smollm2-360m-instruct-q8_0.gguf',
-    downloadSizeBytes: 386_404_992,
-    memoryRequiredBytes: 500_000_000,
-    contextLength: 2048,
-  },
-
-  // --- Qwen (Alibaba) ---
-  {
-    // iOS parity: ModelCatalogBootstrap.swift:50-59 — Q6_K quant, base model
-    // of the seeded abliterated LoRA adapter, hence supportsLora.
-    id: 'qwen2.5-0.5b-instruct-q6_k',
-    name: 'Qwen 2.5 0.5B Instruct Q6_K',
-    description: 'Compact instruction LLM; base model of the abliterated LoRA adapter.',
-    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-    format: ModelFormat.MODEL_FORMAT_GGUF,
-    downloadUrl:
-      'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf',
-    downloadSizeBytes: 650_379_104,
-    memoryRequiredBytes: 750_000_000,
-    contextLength: 4096,
-    supportsLora: true,
-  },
-  {
-    // iOS parity: ModelCatalogBootstrap.swift:102-109
-    id: 'qwen3-0.6b-q4_k_m',
-    name: 'Qwen3 0.6B Q4_K_M',
-    description: 'Qwen3 series compact LLM with thinking-mode support.',
-    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-    format: ModelFormat.MODEL_FORMAT_GGUF,
-    downloadUrl:
-      'https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf',
-    downloadSizeBytes: 396_705_472,
-    memoryRequiredBytes: 500_000_000,
-    contextLength: 4096,
-    supportsThinking: true,
-  },
-  {
-    // iOS parity: ModelCatalogBootstrap.swift:118-125
-    id: 'qwen3-4b-q4_k_m',
-    name: 'Qwen3 4B Q4_K_M',
-    description: 'Qwen3 series larger LLM with thinking-mode support.',
-    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-    format: ModelFormat.MODEL_FORMAT_GGUF,
-    downloadUrl:
-      'https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf',
-    downloadSizeBytes: 2_497_281_312,
-    memoryRequiredBytes: 3_000_000_000,
-    contextLength: 4096,
-    supportsThinking: true,
-  },
   {
     id: 'qwen3.5-0.8b-q4_k_m',
     name: 'Qwen3.5 0.8B Q4_K_M',
@@ -283,25 +216,6 @@ const CATALOG: readonly CatalogEntry[] = [
     // Exact Content-Length of the LFS object.
     downloadSizeBytes: 153_406_304,
     memoryRequiredBytes: 190_000_000,
-    contextLength: 2048,
-  },
-  {
-    // iOS parity: ModelCatalogBootstrap.swift:67-73. ONE quantization per
-    // model: the Q8_0 sibling of this row is deliberately absent (see the
-    // omission list in the file header) — two quants of the same 350M model
-    // differ only in bytes (229 MB vs 379 MB), so the second row costs a
-    // catalog slot and a "which one do I pick?" decision without adding a
-    // capability.
-    id: 'lfm2-350m-q4_k_m',
-    name: 'LiquidAI LFM2 350M Q4_K_M',
-    description: 'LiquidAI compact LLM tuned for fast on-device chat.',
-    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-    format: ModelFormat.MODEL_FORMAT_GGUF,
-    downloadUrl:
-      'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf',
-    downloadSizeBytes: 229_309_376,
-    memoryRequiredBytes: 300_000_000,
     contextLength: 2048,
   },
 
@@ -470,36 +384,6 @@ const CATALOG: readonly CatalogEntry[] = [
       },
     ],
   },
-
-  // --- LFM2-VL (Liquid AI) ---
-  {
-    // iOS parity: ModelCatalogBootstrap.swift:159-171 (multi-file)
-    id: 'lfm2-vl-450m-q8_0',
-    name: 'LFM2-VL 450M',
-    description: 'LiquidAI LFM2-VL vision-language model (primary GGUF + mmproj sidecar).',
-    category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-    format: ModelFormat.MODEL_FORMAT_GGUF,
-    downloadUrl:
-      'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf',
-    downloadSizeBytes: 483_105_280,
-    memoryRequiredBytes: 650_000_000,
-    contextLength: 2048,
-    files: [
-      {
-        url: 'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf',
-        filename: 'LFM2-VL-450M-Q8_0.gguf',
-        role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
-        sizeBytes: 379_215_264,
-      },
-      {
-        url: 'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf',
-        filename: 'mmproj-LFM2-VL-450M-Q8_0.gguf',
-        role: ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR,
-        sizeBytes: 103_890_016,
-      },
-    ],
-  },
   {
     // LiquidAI's LFM2.5-VL 3B — the vision-language sibling of the LFM2.5 text
     // rows above, and the largest VLM Liquid publishes as GGUF. Listed for
@@ -539,6 +423,278 @@ const CATALOG: readonly CatalogEntry[] = [
         filename: 'mmproj-LFM2.5-VL-3B-Q8_0.gguf',
         role: ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR,
         sizeBytes: 583_109_120,
+      },
+    ],
+  },
+
+  // --- Added from the verified model list; oversized rows stay catalogued and
+  //     are gated by webModelCompatibility rather than hidden. ---
+  {
+    id: 'lfm2.5-1.2b-instruct-q4_k_m',
+    name: 'LFM2.5 1.2B Instruct Q4_K_M',
+    description: 'Liquid AI LFM2.5, 1.2B parameters.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf',
+    downloadSizeBytes: 730_895_168,
+    memoryRequiredBytes: 891_692_104,
+    contextLength: 4096,
+  },
+  {
+    id: 'lfm2.5-1.2b-thinking-q4_k_m',
+    name: 'LFM2.5 1.2B Thinking Q4_K_M',
+    description: 'Liquid AI LFM2.5, 1.2B parameters.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/LiquidAI/LFM2.5-1.2B-Thinking-GGUF/resolve/main/LFM2.5-1.2B-Thinking-Q4_K_M.gguf',
+    downloadSizeBytes: 730_895_360,
+    memoryRequiredBytes: 891_692_339,
+    contextLength: 4096,
+    supportsThinking: true,
+  },
+  {
+    id: 'lfm2.5-2.6b-q4_k_m',
+    name: 'LFM2.5 2.6B Q4_K_M',
+    description: 'Liquid AI LFM2.5, 2.6B parameters.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/LiquidAI/LFM2.5-2.6B-GGUF/resolve/main/LFM2.5-2.6B-Q4_K_M.gguf',
+    downloadSizeBytes: 1_674_455_040,
+    memoryRequiredBytes: 2_042_835_148,
+    contextLength: 4096,
+    supportsThinking: true,
+  },
+  {
+    id: 'gemma-4-e4b-it-q4_k_m',
+    name: 'Gemma 4 E4B IT Q4_K_M',
+    description: 'Google Gemma 4, E4B parameters.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_M.gguf',
+    downloadSizeBytes: 4_977_171_584,
+    memoryRequiredBytes: 6_072_149_332,
+    contextLength: 4096,
+  },
+  {
+    id: 'granite-4.1-8b-q4_k_m',
+    name: 'IBM Granite 4.1 8B Q4_K_M',
+    description: 'IBM Granite 4.1, 8B parameters.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/unsloth/granite-4.1-8b-GGUF/resolve/main/granite-4.1-8b-Q4_K_M.gguf',
+    downloadSizeBytes: 5_347_915_136,
+    memoryRequiredBytes: 6_524_456_465,
+    contextLength: 4096,
+  },
+  {
+    id: 'qwen3.5-9b-q4_k_m',
+    name: 'Qwen3.5 9B Q4_K_M',
+    description: 'Alibaba Qwen3.5, 9B parameters.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf',
+    downloadSizeBytes: 5_680_522_464,
+    memoryRequiredBytes: 6_930_237_406,
+    contextLength: 4096,
+    supportsThinking: true,
+  },
+  {
+    id: 'gemma-4-12b-it-q4_k_m',
+    name: 'Gemma 4 12B IT Q4_K_M',
+    description: 'Google Gemma 4, 12B parameters.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/unsloth/gemma-4-12b-it-GGUF/resolve/main/gemma-4-12b-it-Q4_K_M.gguf',
+    downloadSizeBytes: 7_121_861_440,
+    memoryRequiredBytes: 8_688_670_956,
+    contextLength: 4096,
+  },
+  {
+    id: 'maple-preview-tq1_0',
+    name: 'Maple Preview 20B-A1B TQ1_0 (1-bit)',
+    description: 'Deepgrove Maple, 20B-A1B parameters.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/deepgrove/maple-preview-GGUF/resolve/main/maple-preview-TQ1_0-head-Q4_K.gguf',
+    downloadSizeBytes: 4_984_016_416,
+    memoryRequiredBytes: 6_080_500_027,
+    contextLength: 4096,
+    supportsThinking: true,
+  },
+  {
+    id: 'qwen3.8-27b-q4_k_m',
+    name: 'Qwen3.8 27B UD-Q4_K_M',
+    description: 'Alibaba Qwen3.8, 27B parameters.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/main/Qwen3.8-27B-UD-Q4_K_M.gguf',
+    downloadSizeBytes: 16_464_440_224,
+    memoryRequiredBytes: 20_086_617_073,
+    contextLength: 4096,
+    supportsThinking: true,
+  },
+  {
+    id: 'gemma-4-26b-a4b-it-q4_k_m',
+    name: 'Gemma 4 26B-A4B IT Q4_K_M',
+    description: 'Google Gemma 4, 26B-A4B parameters.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/gemma-4-26B-A4B-it-UD-Q4_K_M.gguf',
+    downloadSizeBytes: 16_947_541_728,
+    memoryRequiredBytes: 20_676_000_908,
+    contextLength: 4096,
+  },
+  {
+    id: 'granite-4.1-30b-q4_k_m',
+    name: 'IBM Granite 4.1 30B Q4_K_M',
+    description: 'IBM Granite 4.1, 30B parameters.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/unsloth/granite-4.1-30b-GGUF/resolve/main/granite-4.1-30b-Q4_K_M.gguf',
+    downloadSizeBytes: 17_490_241_472,
+    memoryRequiredBytes: 21_338_094_595,
+    contextLength: 4096,
+  },
+  {
+    id: 'gemma-4-31b-it-q4_k_m',
+    name: 'Gemma 4 31B IT Q4_K_M',
+    description: 'Google Gemma 4, 31B parameters.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/unsloth/gemma-4-31b-it-GGUF/resolve/main/gemma-4-31B-it-Q4_K_M.gguf',
+    downloadSizeBytes: 18_323_733_440,
+    memoryRequiredBytes: 22_354_954_796,
+    contextLength: 4096,
+  },
+  {
+    id: 'lfm2.5-vl-1.6b-q4_k_m',
+    name: 'LFM2.5 VL 1.6B Q4_K_M',
+    description: 'Liquid AI LFM2.5, 1.6B parameters.',
+    category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/LiquidAI/LFM2.5-VL-1.6B-GGUF/resolve/main/LFM2.5-VL-1.6B-Q4_K_M.gguf',
+    downloadSizeBytes: 730_896_256,
+    memoryRequiredBytes: 891_693_432,
+    contextLength: 4096,
+    files: [
+      {
+        url: 'https://huggingface.co/LiquidAI/LFM2.5-VL-1.6B-GGUF/resolve/main/LFM2.5-VL-1.6B-Q4_K_M.gguf',
+        filename: 'LFM2.5-VL-1.6B-Q4_K_M.gguf',
+        role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
+        sizeBytes: 730_896_256,
+      },
+      {
+        url: 'https://huggingface.co/LiquidAI/LFM2.5-VL-1.6B-GGUF/resolve/main/mmproj-LFM2.5-VL-1.6b-BF16.gguf',
+        filename: 'mmproj-LFM2.5-VL-1.6b-BF16.gguf',
+        role: ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR,
+        sizeBytes: 855_763_328,
+      },
+    ],
+  },
+  {
+    id: 'gemma-4-e2b-it-vision-q4_0',
+    name: 'Gemma 4 E2B Vision Q4_0',
+    description: 'Google Gemma 4, E2B parameters.',
+    category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_0.gguf',
+    downloadSizeBytes: 2_841_481_184,
+    memoryRequiredBytes: 3_466_607_044,
+    contextLength: 4096,
+    files: [
+      {
+        url: 'https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_0.gguf',
+        filename: 'gemma-4-E2B-it-Q4_0.gguf',
+        role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
+        sizeBytes: 2_841_481_184,
+      },
+      {
+        url: 'https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF/resolve/main/mmproj-gemma-4-E2B-it-BF16.gguf',
+        filename: 'mmproj-gemma-4-E2B-it-BF16.gguf',
+        role: ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR,
+        sizeBytes: 986_833_664,
+      },
+    ],
+  },
+  {
+    id: 'gemma-4-e4b-it-vision-q4_0',
+    name: 'Gemma 4 E4B Vision Q4_0',
+    description: 'Google Gemma 4, E4B parameters.',
+    category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/ggml-org/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_0.gguf',
+    downloadSizeBytes: 4_590_807_392,
+    memoryRequiredBytes: 5_600_785_018,
+    contextLength: 4096,
+    files: [
+      {
+        url: 'https://huggingface.co/ggml-org/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_0.gguf',
+        filename: 'gemma-4-E4B-it-Q4_0.gguf',
+        role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
+        sizeBytes: 4_590_807_392,
+      },
+      {
+        url: 'https://huggingface.co/ggml-org/gemma-4-E4B-it-GGUF/resolve/main/mmproj-gemma-4-E4B-it-BF16.gguf',
+        filename: 'mmproj-gemma-4-E4B-it-BF16.gguf',
+        role: ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR,
+        sizeBytes: 991_552_256,
+      },
+    ],
+  },
+  {
+    id: 'muse-glimmer-30b-q4_k_xl',
+    name: 'Muse Glimmer 30B UD-Q4_K_XL',
+    description: 'Meta Muse Glimmer, 30B parameters.',
+    category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/unsloth/Muse-Glimmer-30B-GGUF/resolve/main/Muse-Glimmer-30B-UD-Q4_K_XL.gguf',
+    downloadSizeBytes: 15_878_222_368,
+    memoryRequiredBytes: 19_371_431_288,
+    contextLength: 4096,
+    files: [
+      {
+        url: 'https://huggingface.co/unsloth/Muse-Glimmer-30B-GGUF/resolve/main/Muse-Glimmer-30B-UD-Q4_K_XL.gguf',
+        filename: 'Muse-Glimmer-30B-UD-Q4_K_XL.gguf',
+        role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
+        sizeBytes: 15_878_222_368,
+      },
+      {
+        url: 'https://huggingface.co/unsloth/Muse-Glimmer-30B-GGUF/resolve/main/mmproj-Muse-Glimmer-30B-BF16.gguf',
+        filename: 'mmproj-Muse-Glimmer-30B-BF16.gguf',
+        role: ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR,
+        sizeBytes: 3_849_173_728,
       },
     ],
   },
